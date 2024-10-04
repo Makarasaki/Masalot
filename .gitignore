@@ -1,0 +1,11 @@
+engine/build/*
+!engine/build/.gitkeep
+
+training/build/*
+!training/build/.gitkeep
+
+training/NN_weights/*
+!training/NN_weights/.gitkeep
+
+data_preparation/bin/*
+!data_preparation/bin/.gitkeep
