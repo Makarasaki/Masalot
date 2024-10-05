@@ -12,3 +12,5 @@ data_preparation/bin/*
 
 data/*
 !data/.gitkeep
+
+.vscode/*
