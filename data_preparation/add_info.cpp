@@ -75,44 +75,6 @@ uint64_t extractInfoFromFEN(const std::string& FEN) {
     return info;  // The first 5 bits will have the information, rest will be zeros
 }
 
-// Function to update the 'info' column in the database for each FEN
-// void updateInfoColumn(sqlite3* db, const std::string& tableName) {
-//     sqlite3_stmt* stmt;
-//     std::string select_query = "SELECT fen, eval FROM " + tableName;
-//     std::string update_query = "UPDATE " + tableName + " SET info = ? WHERE fen = ? AND eval = ?";
-
-//     if (sqlite3_prepare_v2(db, select_query.c_str(), -1, &stmt, 0) != SQLITE_OK) {
-//         std::cerr << "Error preparing select statement: " << sqlite3_errmsg(db) << std::endl;
-//         return;
-//     }
-
-//     sqlite3_stmt* update_stmt;
-//     if (sqlite3_prepare_v2(db, update_query.c_str(), -1, &update_stmt, 0) != SQLITE_OK) {
-//         std::cerr << "Error preparing update statement: " << sqlite3_errmsg(db) << std::endl;
-//         sqlite3_finalize(stmt);
-//         return;
-//     }
-
-//     while (sqlite3_step(stmt) == SQLITE_ROW) {
-//         std::string fen = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
-//         std::string evaluation = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
-
-//         uint64_t info = extractInfoFromFEN(fen);
-//         sqlite3_bind_int64(update_stmt, 1, info);
-//         sqlite3_bind_text(update_stmt, 2, fen.c_str(), -1, SQLITE_STATIC);
-//         sqlite3_bind_text(update_stmt, 3, evaluation.c_str(), -1, SQLITE_STATIC);
-
-//         if (sqlite3_step(update_stmt) != SQLITE_DONE) {
-//             std::cerr << "Error updating row with FEN " << fen << ": " << sqlite3_errmsg(db) << std::endl;
-//         }
-
-//         sqlite3_reset(update_stmt);
-//     }
-
-//     sqlite3_finalize(stmt);
-//     sqlite3_finalize(update_stmt);
-// }
-
 void updateInfoColumn(sqlite3* db, const std::string& tableName) {
     sqlite3_stmt* stmt;
     std::string select_query = "SELECT fen, eval FROM " + tableName;
