@@ -9,3 +9,6 @@ training/NN_weights/*
 
 data_preparation/bin/*
 !data_preparation/bin/.gitkeep
+
+data/*
+!data/.gitkeep
