@@ -17,6 +17,10 @@ struct ChessNet : torch::nn::Module {
 
     torch::Tensor forward(torch::Tensor x);
 
+    void initialize_weights();
 };
+
+
+torch::Tensor bitboards_to_tensor(const std::vector<std::vector<std::vector<int>>>& bitboards);
 
 #endif // CHESSNET_H

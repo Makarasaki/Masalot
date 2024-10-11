@@ -38,3 +38,21 @@ torch::Tensor ChessNet::forward(torch::Tensor x) {
 
     return x;
 }
+
+void ChessNet::initialize_weights() {
+    for (auto& module : modules(/*include_self=*/false)) {
+        if (auto* conv = dynamic_cast<torch::nn::Conv2dImpl*>(module.get())) {
+            // Xavier initialization for Conv2d weights
+            torch::nn::init::xavier_uniform_(conv->weight);
+            if (conv->options.bias()) {  // Check if bias exists for the conv layer
+                torch::nn::init::zeros_(conv->bias);  // No dereference needed, pass bias tensor directly
+            }
+        } else if (auto* fc = dynamic_cast<torch::nn::LinearImpl*>(module.get())) {
+            // Xavier initialization for Linear layers
+            torch::nn::init::xavier_uniform_(fc->weight);
+            if (fc->options.bias()) {  // Check if bias exists for the linear layer
+                torch::nn::init::zeros_(fc->bias);  // No dereference needed, pass bias tensor directly
+            }
+        }
+    }
+}

@@ -110,6 +110,7 @@ float evaluate(ChessNet &model, const std::string &pos)
     positionINTensor = positionINTensor.unsqueeze(0);
     torch::Tensor output = model.forward(positionINTensor);
 
+    std::cout << pos << "eval:" << output.item<float>() << std::endl;
     // Extract scalar value and return as float
     return output.item<float>();
 }
