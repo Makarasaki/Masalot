@@ -39,19 +39,24 @@ torch::Tensor ChessNet::forward(torch::Tensor x) {
     return x;
 }
 
-// void ChessNet::save(torch::serialize::OutputArchive& archive) const {
-//     archive.write("conv1", conv1);
-//     archive.write("conv2", conv2);
-//     archive.write("fc1", fc1);
-//     archive.write("fc2", fc2);
-// }
+void ChessNet::initialize_weights() {
+    for (auto& module : modules(/*include_self=*/false)) {
+        if (auto* conv = dynamic_cast<torch::nn::Conv2dImpl*>(module.get())) {
+            // Xavier initialization for Conv2d weights
+            torch::nn::init::xavier_uniform_(conv->weight);
+            if (conv->options.bias()) {  // Check if bias exists for the conv layer
+                torch::nn::init::zeros_(conv->bias);  // No dereference needed, pass bias tensor directly
+            }
+        } else if (auto* fc = dynamic_cast<torch::nn::LinearImpl*>(module.get())) {
+            // Xavier initialization for Linear layers
+            torch::nn::init::xavier_uniform_(fc->weight);
+            if (fc->options.bias()) {  // Check if bias exists for the linear layer
+                torch::nn::init::zeros_(fc->bias);  // No dereference needed, pass bias tensor directly
+            }
+        }
+    }
+}
 
-// void ChessNet::load(torch::serialize::InputArchive& archive) {
-//     archive.read("conv1", conv1);
-//     archive.read("conv2", conv2);
-//     archive.read("fc1", fc1);
-//     archive.read("fc2", fc2);
-// }
 
 torch::Tensor bitboards_to_tensor(const std::vector<std::vector<std::vector<int>>>& bitboards) {
     std::vector<torch::Tensor> channels;

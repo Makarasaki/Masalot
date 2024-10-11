@@ -6,26 +6,6 @@
 #include <vector>
 #include <cstdint>
 
-// struct ChessNet : torch::nn::Module {
-//     torch::nn::Linear fc1{nullptr}, fc2{nullptr}, fc3{nullptr};
-
-//     ChessNet();
-//     torch::Tensor forward(torch::Tensor x);
-// };
-
-
-// struct ChessNet : torch::nn::Module {
-//     torch::nn::Conv2d conv1, conv2;
-//     torch::nn::Linear fc1, fc2;
-
-//     ChessNet();  // Constructor declaration
-
-//     torch::Tensor forward(torch::Tensor x);
-
-//     // void save(torch::serialize::OutputArchive& archive) const override;
-//     // void load(torch::serialize::InputArchive& archive) override;
-// };
-
 struct ChessNet : torch::nn::Module {
     torch::nn::Conv2d conv1, conv2, conv3, conv4;
 
@@ -37,9 +17,7 @@ struct ChessNet : torch::nn::Module {
 
     torch::Tensor forward(torch::Tensor x);
 
-    // Save and load methods (optional)
-    // void save(torch::serialize::OutputArchive& archive) const override;
-    // void load(torch::serialize::InputArchive& archive) override;
+    void initialize_weights();
 };
 
 
