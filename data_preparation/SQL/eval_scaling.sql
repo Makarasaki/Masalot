@@ -1,24 +1,23 @@
-UPDATE test_evals_1000
-SET eval = '+1000'
+ALTER TABLE evaluations ADD COLUMN eval_scaled FLOAT;
+
+UPDATE evaluations
+SET eval_scaled = 250
 WHERE eval LIKE '#+%';
 
-UPDATE test_evals_1000
-SET eval = '-1000'
+UPDATE evaluations
+SET eval_scaled = -250
 WHERE eval LIKE '#-%';
 
 
 
-UPDATE test_evals_1000
-SET eval = '+1000'
-WHERE CAST(eval AS INTEGER) > 1000;
+UPDATE evaluations
+SET eval_scaled = 250
+WHERE CAST(eval AS INTEGER) > 250;
 
-UPDATE test_evals_1000
-SET eval = '-1000'
-WHERE CAST(eval AS INTEGER) < -1000;
-
-
-ALTER TABLE test_evals_1000 ADD COLUMN eval_scaled FLOAT;
+UPDATE evaluations
+SET eval_scaled = -250
+WHERE CAST(eval AS INTEGER) < -250;
 
 
-UPDATE test_evals_1000
-SET eval_scaled = CAST(eval AS FLOAT) / 1000;
+UPDATE evaluations
+SET eval_scaled = CAST(eval_scaled AS FLOAT) / 250;

@@ -5,6 +5,8 @@
 #include <vector>
 #include <map>
 #include <cstdint>
+#include <chrono>
+// using namespace std::chrono;
 
 // g++ -o bin/one_to_add.exe one_to_add_them_all.cpp -lsqlite3
 
@@ -254,6 +256,9 @@ void updateBitboards(sqlite3* db, const std::string& tableName) {
     // Counter to process records in batches
     const int batchSize = 500;
     int counter = 0;
+    auto start = std::chrono::high_resolution_clock::now();
+    auto stop = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
 
     while (sqlite3_step(stmt) == SQLITE_ROW) {
         std::string fen = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
@@ -303,6 +308,12 @@ void updateBitboards(sqlite3* db, const std::string& tableName) {
             std::cout << "Counter: " << counter << std::endl;
             sqlite3_exec(db, "COMMIT", NULL, NULL, NULL);
             sqlite3_exec(db, "BEGIN TRANSACTION", NULL, NULL, NULL);
+        
+            stop = std::chrono::high_resolution_clock::now();
+            duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
+ 
+            std::cout << duration.count() << " seconds" << std::endl;
+            start = std::chrono::high_resolution_clock::now();
         }
     }
     // Commit the last remaining records
@@ -315,7 +326,11 @@ void updateBitboards(sqlite3* db, const std::string& tableName) {
 // Main function
 int main() {
     std::string db_name = "../data/chess_evals.db";
-    std::string table_name = "one_program_test";
+    std::string table_name = "evaluations";
+
+    auto start_all = std::chrono::high_resolution_clock::now();
+    auto stop_all = std::chrono::high_resolution_clock::now();
+    auto duration_all = std::chrono::duration_cast<std::chrono::seconds>(stop_all - start_all);
 
     sqlite3* db;
     if (sqlite3_open(db_name.c_str(), &db) != SQLITE_OK) {
@@ -330,11 +345,20 @@ int main() {
 
     // Update the bitboards, en passant, and info columns
     updateBitboards(db, table_name);
+    std::cout<< "Finished updateBitboards function" << std::endl;
     // updateInfoColumn(db, table_name);
 
     sqlite3_close(db);
+    std::cout<< "Closed DB" << std::endl;
+    stop_all = std::chrono::high_resolution_clock::now();
+    duration_all = std::chrono::duration_cast<std::chrono::seconds>(stop_all - start_all);
+    std::cout << duration_all.count() << " Everything took microseconds" << std::endl;
     return 0;
 }
 
-
+// wsl:
 // g++ -o bin/one_to_add.exe one_to_add_them_all.cpp -lsqlite3
+
+// Windows:
+// gcc -c "C:\Program Files\sqlite\sqlite-amalgamation-3460100\sqlite3.c" -o sqlite3.o
+// g++ -o bin/one_to_add.exe one_to_add_them_all.cpp sqlite3.o -I"C:\Program Files\sqlite\sqlite-amalgamation-3460100"
