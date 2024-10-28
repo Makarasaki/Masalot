@@ -27,6 +27,7 @@ int main()
     {
         std::cout << "CUDA is not available. Using CPU." << std::endl;
     }
+    // torch::Device device(torch::cuda::is_available() ? torch::kCUDA : torch::kCPU);
 
     sqlite3 *db;
     if (sqlite3_open("../../data/chess_evals.db", &db))
@@ -38,19 +39,23 @@ int main()
     // Instantiate model and move it to the chosen device
     ChessNet net;
     net.to(device);
+    // std::cout<<"0"<<std::endl;
+    // torch::optim::Adam optimizer(net.parameters(), torch::optim::AdamOptions(1e-5));
+    torch::optim::SGD optimizer(net.parameters(), torch::optim::SGDOptions(1e-1).momentum(0.9).weight_decay(1e-4));
+    torch::optim::StepLR scheduler(optimizer, /*step_size=*/6000, /*gamma=*/0.1);
 
-    torch::optim::Adam optimizer(net.parameters(), torch::optim::AdamOptions(1e-4));
-
-    const int batch_size = 5000;
-    const int num_epochs = 2400;
+    const int batch_size = 512;
+    const int num_epochs = 23437;
 
     float min_loss = std::numeric_limits<float>::max(); // Track the minimum loss
     std::string model_path = "../NN_weights/best_model.pt";
 
     for (int epoch = 0; epoch < num_epochs; ++epoch)
     {
-        auto data_batch = load_data(db, batch_size, epoch);
+        auto start_time = std::chrono::high_resolution_clock::now();
 
+        auto data_batch = load_data(db, batch_size, epoch);
+        // std::cout<<"1"<<std::endl;
         if (data_batch.empty())
         {
             std::cerr << "No data found in database." << std::endl;
@@ -65,21 +70,25 @@ int main()
             inputs.push_back(input_tensor);
             targets.push_back(torch::tensor(data.evaluation, torch::dtype(torch::kFloat32)).to(device)); // Move targets to device
         }
-
-        auto input_tensor = torch::cat(inputs, 0); // (batch_size, 14, 8, 8)
+        // std::cout<<"2"<<std::endl;
+        auto input_tensor = torch::cat(inputs, 0); // (batch_size, 14, 8, 8), (batch_size, 18, 8, 8)
         auto target_tensor = torch::stack(targets);
+
+        std::cout << "Target avg: " << target_tensor.mean().item().toFloat() << std::endl;
+        std::cout << "Target max: " << target_tensor.max().item().toFloat() << std::endl;
+        std::cout << "Target min: " << target_tensor.min().item().toFloat() << std::endl;
 
         optimizer.zero_grad();
 
         auto output = net.forward(input_tensor);
 
-        auto loss = torch::mse_loss(output.squeeze(), target_tensor);
+        auto loss = torch::l1_loss(output.squeeze(), target_tensor);
 
         loss.backward();
+        torch::nn::utils::clip_grad_norm_(net.parameters(), 1.0);
         optimizer.step();
 
         float current_loss = loss.item<float>();
-        std::cout << "Epoch [" << epoch + 1 << "/" << num_epochs << "], Loss: " << current_loss << std::endl;
 
         // Save the model if the current loss is lower than the minimum loss
         if (current_loss < min_loss)
@@ -90,13 +99,24 @@ int main()
         }
 
         // Save the model at regular intervals
-        if (epoch % 450 == 0)
+        if (epoch % 6000 == 0)
         {
             std::string epoch_model_path = "../NN_weights/model_epoch_" + std::to_string(epoch) + ".pt";
             save_model(net, device, epoch_model_path);
             std::cout << "Epoch " << epoch << ": Model saved with loss " << current_loss << "!" << std::endl;
         }
+
+        // Record end time and calculate duration
+        auto end_time = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<float> duration = end_time - start_time;
+        std::cout << "Epoch [" << epoch + 1 << "/" << num_epochs << "], Loss: " << current_loss << std::endl;
+        std::cout.flush();
+        std::cout << "Time taken for epoch " << epoch + 1 << ": " << duration.count() << " seconds." << std::endl;
+        std::cout << "------------------------------------------------" << std::endl;
     }
+
+    std::string epoch_model_path = "../NN_weights/model_last.pt";
+    save_model(net, device, epoch_model_path);
 
     sqlite3_close(db);
     return 0;

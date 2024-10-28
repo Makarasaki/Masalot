@@ -4,6 +4,7 @@
 // #include "../include/chessnet.h"
 #include <iostream>
 #include <limits>
+#include <future>
 
 bool isWhite(const std::string &fen)
 {
@@ -76,8 +77,11 @@ float alpha_beta(ChessNet &model, const std::string &pos, int depth, float alpha
             max_eval = std::max(max_eval, eval);
             alpha = std::max(alpha, eval);
             // std::cout << "alpha:" << alpha << std::endl;
-            if (beta <= alpha)
+            if (beta <= alpha){
+                std::cout << "depth: " << depth << std::endl;
+                std::cout << "Cutoff!" << depth << std::endl;
                 break; // Beta cutoff
+            }
         }
         return max_eval;
     }
@@ -90,8 +94,11 @@ float alpha_beta(ChessNet &model, const std::string &pos, int depth, float alpha
             min_eval = std::min(min_eval, eval);
             beta = std::min(beta, eval);
             // std::cout << "beta:" << beta << std::endl;
-            if (beta <= alpha)
+            if (beta <= alpha){
+                std::cout << "depth: " << depth << std::endl;
+                std::cout << "Cutoff!" << depth << std::endl;
                 break; // Alpha cutoff
+            }
         }
         return min_eval;
     }
@@ -100,21 +107,29 @@ float alpha_beta(ChessNet &model, const std::string &pos, int depth, float alpha
 // Evaluate the given chess position (stub implementation).
 float evaluate(ChessNet &model, const std::string &pos)
 {
-    // ChessData positionInBitboards;
-    // positionInBitboards.bitboards.resize(14);
-    // positionInBitboards.bitboards = fenToBitboards(pos);
-
+    // Convert the FEN position to bitboards and then to a tensor
     ChessData positionInBitboards = fenToBitboards(pos);
     torch::Tensor positionINTensor = bitboardsToTensor(positionInBitboards.bitboards);
     // Reshape input tensor to [1, 14, 8, 8] for batch processing
     positionINTensor = positionINTensor.unsqueeze(0);
+
+    // Check if CUDA is available
+    if (torch::cuda::is_available()) {
+        positionINTensor = positionINTensor.to(torch::kCUDA);
+    }
+    // Forward pass
     torch::Tensor output = model.forward(positionINTensor);
 
-    std::cout << pos << "eval:" << output.item<float>() << std::endl;
-    // Extract scalar value and return as float
-    return output.item<float>();
+    // Retrieve output as a float
+    float eval = output.item<float>();
+
+    // Print the evaluation and return
+    std::cout << pos << " eval: " << eval << std::endl;
+    return eval;
 }
 
+
+// 2808.73 seconds.
 // Search function to find the best move.
 std::string search_best_move(ChessNet &model, std::string pos, int depth)
 {
@@ -159,3 +174,43 @@ std::string search_best_move(ChessNet &model, std::string pos, int depth)
     std::cout << "najlepszy" << best_move << std::endl;
     return best_move;
 }
+
+
+// Time taken to find best move: 1107.04 seconds.
+// std::string search_best_move(ChessNet &model, const std::string pos, int depth)
+// {
+//     bool isWhite_var = isWhite(pos);
+//     float best_eval = isWhite_var ? std::numeric_limits<float>::min() : std::numeric_limits<float>::max();
+//     std::string best_move = "";
+
+//     // Generate all possible moves
+//     std::vector<std::string> positions = generate_positions(pos, isWhite_var);
+
+//     // Store futures for each asynchronous evaluation
+//     std::vector<std::future<std::pair<float, std::string>>> futures;
+
+//     for (const auto &new_pos : positions)
+//     {
+//         // Launch each evaluation in a separate asynchronous task
+//         futures.push_back(std::async(std::launch::async, [&model, new_pos, depth, isWhite_var]() {
+//             float eval = alpha_beta(model, new_pos, depth - 1,
+//                                     std::numeric_limits<float>::min(),
+//                                     std::numeric_limits<float>::max(),
+//                                     !isWhite_var);
+//             return std::make_pair(eval, new_pos);
+//         }));
+//     }
+
+//     // Collect the results and determine the best move
+//     for (auto &fut : futures)
+//     {
+//         auto [eval, move] = fut.get();
+//         if ((isWhite_var && eval > best_eval) || (!isWhite_var && eval < best_eval))
+//         {
+//             best_eval = eval;
+//             best_move = move;
+//         }
+//     }
+
+//     return best_move;
+// }

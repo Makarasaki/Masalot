@@ -11,6 +11,8 @@ struct ChessNet : torch::nn::Module {
 
     torch::nn::BatchNorm2d bn1, bn2, bn3, bn4;
 
+    torch::nn::BatchNorm1d fc2_bn, conv_flat_bn;
+
     torch::nn::Linear fc1, fc2, fc3;
 
     ChessNet();

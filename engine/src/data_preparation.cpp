@@ -145,26 +145,71 @@ std::vector<std::vector<int>> intToBitboard(uint64_t bitboard) {
     return board;
 }
 
+
+std::vector<std::vector<int>> intToBitboardWhites(uint64_t bitboard) {
+    std::vector<std::vector<int>> board(8, std::vector<int>(8, 0));
+    for (int row = 0; row < 8; ++row) {
+        for (int col = 0; col < 8; ++col) {
+            // Extract each bit and place it in the 8x8 matrix
+            board[row][col] = (bitboard >> (row * 8 + col)) & 1;
+        }
+    }
+    return board;
+}
+
+std::vector<std::vector<int>> intToBitboardBlacks(uint64_t bitboard) {
+    std::vector<std::vector<int>> board(8, std::vector<int>(8, 0));
+    for (int row = 0; row < 8; ++row) {
+        for (int col = 0; col < 8; ++col) {
+            // Extract each bit and place it in the 8x8 matrix
+            board[row][col] = (bitboard >> (row * 8 + col)) & 1 ? -1 : 0;
+        }
+    }
+    return board;
+}
+
+std::vector<std::vector<std::vector<int>>> info_to_bitboards(int info) {
+    // Create a vector to hold the 8x8 bitboards for each bit
+    std::vector<std::vector<std::vector<int>>> bitboards;
+
+    // Loop through each bit and create an 8x8 matrix based on the bit value
+    for (int bit = 0; bit < 5; ++bit) {
+        bool bit_value = (info >> bit) & 1;
+        // std::cout << "info bits" << bit_value << std::endl;
+        // Create an 8x8 matrix filled with the bit value
+        std::vector<std::vector<int>> bitboard(8, std::vector<int>(8, bit_value ? 1 : 0));
+        bitboards.push_back(bitboard);
+    }
+
+    return bitboards;
+}
+
 ChessData fenToBitboards(const std::string& FEN){
     ChessData bitboards;
-    bitboards.bitboards.resize(14);
+    bitboards.bitboards.resize(13);
 
     std::vector<std::string> whitePieces = {"P", "N", "B", "R", "Q", "K"};
     std::vector<std::string> blackPieces = {"p", "n", "b", "r", "q", "k"};
 
 
     for (size_t i = 0; i < whitePieces.size(); ++i) {
-        bitboards.bitboards[i] = intToBitboard(FenToBmp(FEN, whitePieces[i][0]));
+        bitboards.bitboards[i] = intToBitboardWhites(FenToBmp(FEN, whitePieces[i][0]));
         }
 
     // Bind the bitboard values for black pieces
     for (size_t i = 0; i < blackPieces.size(); ++i) {
-        bitboards.bitboards[i + whitePieces.size()] = intToBitboard(FenToBmp(FEN, blackPieces[i][0]));
+        bitboards.bitboards[i + whitePieces.size()] = intToBitboardBlacks(FenToBmp(FEN, blackPieces[i][0]));
     }
 
     bitboards.bitboards[whitePieces.size() + blackPieces.size()] = intToBitboard(EnPassantToBitboard(FEN));
     
-    bitboards.bitboards[whitePieces.size() + blackPieces.size() + 1] = intToBitboard(extractInfoFromFEN(FEN));
+    // bitboards.bitboards[whitePieces.size() + blackPieces.size() + 1] = info_to_bitboards(extractInfoFromFEN(FEN));
+
+    //////////////////////////////////////////////////
+    std::vector<std::vector<std::vector<int>>> info_bitboards = info_to_bitboards(extractInfoFromFEN(FEN));
+
+        // Append the info bitboards to the entry's bitboards
+    bitboards.bitboards.insert(bitboards.bitboards.end(), info_bitboards.begin(), info_bitboards.end());
 
     return bitboards;
 }

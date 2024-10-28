@@ -10,7 +10,7 @@
 #include "../include/evaluate.h"
 // #include "../include/chessnet.h"
 
-const int PORT = 12346;
+const int PORT = 12345;
 const int BUFFER_SIZE = 1024;
 
 void handle_connection(int client_socket) {
@@ -20,8 +20,15 @@ void handle_connection(int client_socket) {
     ChessNet model;
     torch::serialize::InputArchive input_archive;
     try {
-        input_archive.load_from("../../training/NN_weights/model_epoch_0.pt");
+        input_archive.load_from("../../training/NN_weights/model_last.pt");
         model.load(input_archive);  // Load the weights into the model
+        // Check if CUDA is available
+        if (torch::cuda::is_available()) {
+            model.to(torch::kCUDA);
+        } else {
+            // If not available, keep on CPU
+            model.to(torch::kCPU);
+        }
         std::cout << "Model weights loaded successfully!" << std::endl;
     } catch (const c10::Error& e) {
         std::cerr << "Error loading model weights: " << e.what() << std::endl;
@@ -59,8 +66,11 @@ void handle_connection(int client_socket) {
         std::cout << "Received FEN: " << received_fen << std::endl;
 
         // Get the best move FEN from the model
-        std::string best_move_fen = search_best_move(model, received_fen, 1);  // Depth set to 2 for example
-
+        auto start_time = std::chrono::high_resolution_clock::now();
+        std::string best_move_fen = search_best_move(model, received_fen, 3);  // Depth set to 2 for example
+        auto end_time = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<float> duration = end_time - start_time;
+        std::cout << "Time taken to find best move: " << duration.count() << " seconds." << std::endl;
         std::cout << "Best move: " << best_move_fen << std::endl;
 
         // Send the best move FEN back to the client.
@@ -76,6 +86,8 @@ void handle_connection(int client_socket) {
 }
 
 int main() {
+    unsigned int n = std::thread::hardware_concurrency();
+    std::cout << n << std::endl;
     int server_fd, client_socket;
     struct sockaddr_in address;
     int addrlen = sizeof(address);
