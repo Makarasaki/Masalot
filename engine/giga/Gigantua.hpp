@@ -10,14 +10,27 @@
 #include "Movelist.hpp"
 #include "Chess_Test.hpp"
 
+#include "../include/evaluate.h"
+
 //std::vector<std::tuple<Board, BoardStatus, Movelist::EnPassantTarget>> globalMoveList;
 
 class MoveReciever
 {
 public:
 	static inline uint64_t nodes;
+	ChessNet model;
+    torch::serialize::InputArchive input_archive;
 
 	static _ForceInline void Init(Board& brd, uint64_t EPInit) {
+		MoveReciever::input_archive.load_from("../../training/NN_weights/model_last.pt");
+		MoveReciever::model.load(input_archive);  // Load the weights into the model
+		// Check if CUDA is available
+		if (torch::cuda::is_available()) {
+			MoveReciever::model.to(torch::kCUDA);
+		} else {
+			// If not available, keep on CPU
+			MoveReciever::model.to(torch::kCPU);
+		}
 		MoveReciever::nodes = 0;
 		Movelist::Init(EPInit);
 	}
@@ -297,44 +310,44 @@ const auto _keep1 = _map(0,0);
 const auto _keep2 = _map(0,0,0);
 const auto _keep4 = _map(0, 0, Board::Default(), Board::Default());
 
-int main(int argc, char** argv)
-{
-	std::random_device rd;
-	std::mt19937_64 eng(rd());
-	std::uniform_int_distribution<unsigned long long> distr;
-	srand(static_cast<unsigned int>(time(0)));
+// int main(int argc, char** argv)
+// {
+// 	std::random_device rd;
+// 	std::mt19937_64 eng(rd());
+// 	std::uniform_int_distribution<unsigned long long> distr;
+// 	srand(static_cast<unsigned int>(time(0)));
 
-	//std::string_view dbg = "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8"
+// 	//std::string_view dbg = "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8"
 
-	std::string_view def = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-	std::string_view kiwi = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1";
-	//std::string_view pintest = "6Q1/8/4k3/8/4r3/1K6/4R3/8 b - - 0 1";
-	//std::string_view def = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq -";
-	std::string_view midgame = "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10";
-	std::string_view endgame = "5nk1/pp3pp1/2p4p/q7/2PPB2P/P5P1/1P5K/3Q4 w - - 1 28";
+// 	std::string_view def = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+// 	std::string_view kiwi = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1";
+// 	//std::string_view pintest = "6Q1/8/4k3/8/4r3/1K6/4R3/8 b - - 0 1";
+// 	//std::string_view def = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq -";
+// 	std::string_view midgame = "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10";
+// 	std::string_view endgame = "5nk1/pp3pp1/2p4p/q7/2PPB2P/P5P1/1P5K/3Q4 w - - 1 28";
 
-	std::string_view stalemate = "7k/5Q2/8/8/8/8/8/K7 b - - 0 1";
-	std::string_view checkmate = "7k/6Q1/6K1/8/8/8/8/8 b - - 0 1";
+// 	std::string_view stalemate = "7k/5Q2/8/8/8/8/8/K7 b - - 0 1";
+// 	std::string_view checkmate = "7k/6Q1/6K1/8/8/8/8/8 b - - 0 1";
 
-	std::string_view double_checkmate = "6rk/5N2/5K2/8/8/8/8/7Q b - - 0 1";
-	std::string_view almost_stalemate = "7k/4Q3/5K2/8/8/8/8/8 w - - 0 1";
-	std::string_view onepawn = "7k/6p1/8/8/8/8/8/K7 w - - 0 1";
-	//55.8
+// 	std::string_view double_checkmate = "6rk/5N2/5K2/8/8/8/8/7Q b - - 0 1";
+// 	std::string_view almost_stalemate = "7k/4Q3/5K2/8/8/8/8/8 w - - 0 1";
+// 	std::string_view onepawn = "7k/6p1/8/8/8/8/8/K7 w - - 0 1";
+// 	//55.8
 
 
-	std::cout << "Start" << std::endl;
-	uint64_t depth = 8;
-	float alpha = std::numeric_limits<float>::lowest();
-	float beta = std::numeric_limits<float>::max();
-	auto start = std::chrono::steady_clock::now();
+// 	std::cout << "Start" << std::endl;
+// 	uint64_t depth = 8;
+// 	float alpha = std::numeric_limits<float>::lowest();
+// 	float beta = std::numeric_limits<float>::max();
+// 	auto start = std::chrono::steady_clock::now();
 
-	float evaluation = _PerfT(endgame, depth, alpha, beta);
-	auto end = std::chrono::steady_clock::now();
-	long long delta = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
-	std::cout << "Position evaluation: " << evaluation << std::endl;
-	std::cout << "Czas: " << MoveReciever::nodes << " " << delta / 1000 << "ms " << MoveReciever::nodes * 1.0 / delta << " MNodes/s\n";
-	std::cout << "Koniec mojego testu" << std::endl;
-	std::cout << "nodes: " << MoveReciever::nodes << std::endl;
-	return 0;
+// 	float evaluation = _PerfT(endgame, depth, alpha, beta);
+// 	auto end = std::chrono::steady_clock::now();
+// 	long long delta = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+// 	std::cout << "Position evaluation: " << evaluation << std::endl;
+// 	std::cout << "Czas: " << MoveReciever::nodes << " " << delta / 1000 << "ms " << MoveReciever::nodes * 1.0 / delta << " MNodes/s\n";
+// 	std::cout << "Koniec mojego testu" << std::endl;
+// 	std::cout << "nodes: " << MoveReciever::nodes << std::endl;
+// 	return 0;
 
-}
+// }
