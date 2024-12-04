@@ -9,8 +9,8 @@
 
 #include "Movelist.hpp"
 #include "Chess_Test.hpp"
-
-#include "../include/evaluate.h"
+#include "../../training/include/chessnet.h"
+#include "../include/data_preparation.h"
 
 //std::vector<std::tuple<Board, BoardStatus, Movelist::EnPassantTarget>> globalMoveList;
 
@@ -18,21 +18,115 @@ class MoveReciever
 {
 public:
 	static inline uint64_t nodes;
-	ChessNet model;
-    torch::serialize::InputArchive input_archive;
+	static inline ChessNet model;
 
-	static _ForceInline void Init(Board& brd, uint64_t EPInit) {
-		MoveReciever::input_archive.load_from("../../training/NN_weights/model_last.pt");
-		MoveReciever::model.load(input_archive);  // Load the weights into the model
-		// Check if CUDA is available
-		if (torch::cuda::is_available()) {
-			MoveReciever::model.to(torch::kCUDA);
-		} else {
-			// If not available, keep on CPU
-			MoveReciever::model.to(torch::kCPU);
-		}
+	static _ForceInline void Init(Board& brd, uint64_t EPInit, ChessNet &trained_model) {
 		MoveReciever::nodes = 0;
+		MoveReciever::model = trained_model;
 		Movelist::Init(EPInit);
+	}
+
+	template<class BoardStatus status>
+	static _ForceInline ChessData positionToBitboards(Board& brd) {
+	uint64_t allOnes = ~0ULL;
+    ChessData bitboards;
+    bitboards.bitboards.resize(18);
+
+    bitboards.bitboards[0] = intToBitboardWhites(brd.WPawn);
+    bitboards.bitboards[1] = intToBitboardWhites(brd.WKnight);
+    bitboards.bitboards[2] = intToBitboardWhites(brd.WBishop);
+    bitboards.bitboards[3] = intToBitboardWhites(brd.WRook);
+    bitboards.bitboards[4] = intToBitboardWhites(brd.WQueen);
+    bitboards.bitboards[5] = intToBitboardWhites(brd.WKing);
+
+    bitboards.bitboards[6] = intToBitboardBlacks(brd.BPawn);
+    bitboards.bitboards[7] = intToBitboardBlacks(brd.BKnight);
+    bitboards.bitboards[8] = intToBitboardBlacks(brd.BBishop);
+    bitboards.bitboards[9] = intToBitboardBlacks(brd.BRook);
+    bitboards.bitboards[10] = intToBitboardBlacks(brd.BQueen);
+    bitboards.bitboards[11] = intToBitboardBlacks(brd.BKing);
+    bitboards.bitboards[12] = intToBitboard(Movelist::EnPassantTarget);
+
+	if (status.WhiteMove){
+		bitboards.bitboards[13] = intToBitboard(allOnes);
+	}else{
+		bitboards.bitboards[13] = intToBitboard(0);
+	}
+
+	if (status.WCastleL){
+		bitboards.bitboards[14] = intToBitboard(allOnes);
+	}else{
+		bitboards.bitboards[14] = intToBitboard(0);
+	}
+
+	if (status.WCastleR){
+		bitboards.bitboards[15] = intToBitboard(allOnes);
+	}else{
+		bitboards.bitboards[15] = intToBitboard(0);
+	}
+
+	if (status.BCastleL){
+		bitboards.bitboards[16] = intToBitboard(allOnes);
+	}else{
+		bitboards.bitboards[16] = intToBitboard(0);
+	}
+
+	if (status.BCastleR){
+		bitboards.bitboards[17] = intToBitboard(allOnes);
+	}else{
+		bitboards.bitboards[17] = intToBitboard(0);
+	}
+
+    return bitboards;
+}
+
+	template<class BoardStatus status>
+	static _ForceInline float evaluate(Board& brd)
+	{
+
+		auto start_time = std::chrono::high_resolution_clock::now();
+        ChessData positionInBitboards = positionToBitboards<status>(brd);
+        auto end_time = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<float> duration = end_time - start_time;
+        std::cout << "Time taken positionToBitboards: " << duration.count() << " seconds." << std::endl;
+
+		start_time = std::chrono::high_resolution_clock::now();
+        torch::Tensor positionINTensor = bitboardsToTensor(positionInBitboards.bitboards);
+        end_time = std::chrono::high_resolution_clock::now();
+        duration = end_time - start_time;
+        std::cout << "Time taken bitboardsToTensor: " << duration.count() << " seconds." << std::endl;
+
+		positionINTensor = positionINTensor.unsqueeze(0);
+		if (torch::cuda::is_available()) {
+			std::cout << "using cuda" << std::endl;
+			positionINTensor = positionINTensor.to(torch::kCUDA);
+		}
+
+
+		start_time = std::chrono::high_resolution_clock::now();
+        torch::Tensor output = model.forward(positionINTensor);
+        end_time = std::chrono::high_resolution_clock::now();
+        duration = end_time - start_time;
+        std::cout << "Time taken forward: " << duration.count() << " seconds." << std::endl;
+
+
+		// Convert the FEN position to bitboards and then to a tensor
+		// ChessData positionInBitboards = positionToBitboards<status>(brd);
+		// torch::Tensor positionINTensor = bitboardsToTensor(positionInBitboards.bitboards);
+		// Reshape input tensor to [1, 14, 8, 8] for batch processing
+		// positionINTensor = positionINTensor.unsqueeze(0);
+
+		// Check if CUDA is available
+		// if (torch::cuda::is_available()) {
+		// 	std::cout << "using cuda" << std::endl;
+		// 	positionINTensor = positionINTensor.to(torch::kCUDA);
+		// }
+		// Forward pass
+		// torch::Tensor output = model.forward(positionINTensor);
+
+		// Print the evaluation and return
+		// std::cout << "eval: " << output.item<float>(); << std::endl;
+		return output.item<float>();
 	}
 
 	template<class BoardStatus status>
@@ -41,8 +135,8 @@ public:
 		//std::cout << "Status PERFT0" << std::endl;
 		nodes++;
 		//return 0;
-		float eval = static_cast<float>(rand()) / (static_cast<float>(RAND_MAX) / 2.0f) - 1.0f;
-		//std::cout << "eval: " << eval << std::endl;
+		float eval = evaluate<status>(brd);
+		eval = static_cast<float>(rand()) / (static_cast<float>(RAND_MAX) / 2.0f) - 1.0f;//std::cout << "eval: " << eval << std::endl;
 		return eval;
 	}
 	
@@ -56,7 +150,6 @@ public:
 	template<class BoardStatus status, int depth>
 	static _ForceInline float  PerfT(Board& brd, float alpha, float beta)
 	{
-		//std::cout << "PerfT" << std::endl;
 		//Movelist::EnumerateMoves<status, MoveReciever, depth>(brd);
 		if constexpr (depth == 0)
 			return PerfT0<status>(brd);
@@ -243,9 +336,11 @@ public:
 
 
 template<class BoardStatus status>
-static float PerfT(std::string_view def, Board& brd, int depth, float alpha, float beta)
+static float PerfT(std::string_view def, Board& brd, int depth, float alpha, float beta, ChessNet &model)
 {
-	MoveReciever::Init(brd, FEN::FenEnpassant(def));
+	std::cout << "start init" << std::endl;
+	MoveReciever::Init(brd, FEN::FenEnpassant(def), model);
+	std::cout << "end init" << std::endl;
 
 	//Seemap see;
 	//Movegen::InitBoard<status>(see, brd.UnpackAll());
@@ -282,28 +377,6 @@ static float PerfT(std::string_view def, Board& brd, int depth, float alpha, flo
 	}
 }
 PositionToTemplate(PerfT);
-
-
-//void Chess_Test() {
-//	for (auto pos : Test::Positions)
-//	{
-//		auto v = Test::GetElements(pos, ';');
-//		std::string fen = v[0];
-//
-//		std::cout << fen << "\n";
-//		int to = v.size();
-//		for (int i = 1; i < to; i++) {
-//			auto perftvals = Test::GetElements(v[i], ' ');
-//			uint64_t expected = static_cast<uint64_t>(std::strtol(perftvals[1].c_str(), NULL, 10));
-//			_PerfT(fen, i);
-//			uint64_t result = MoveReciever::nodes;
-//			std::string status = expected == result ? "OK" : "ERROR";
-//			if (expected == result)  std::cout << "   " << i << ": " << result << " " << status << "\n";
-//			else  std::cout << "xxx -> " << i << ": " << result <<" vs " << expected << " " << status << "\n";
-//			
-//		}
-//	}
-//}
 
 const auto _keep0 = _map(0);
 const auto _keep1 = _map(0,0);

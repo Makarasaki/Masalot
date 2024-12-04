@@ -1,5 +1,7 @@
 #include "../include/move_gen.h"
 #include "../include/evaluate.h"
+// #include "../giga/Chess_Base.hpp"
+#include "../giga/Gigantua.hpp"
 // #include "../include/data_preparation.h"
 // #include "../include/chessnet.h"
 #include <iostream>
@@ -124,7 +126,7 @@ float evaluate(ChessNet &model, const std::string &pos)
     float eval = output.item<float>();
 
     // Print the evaluation and return
-    std::cout << pos << " eval: " << eval << std::endl;
+    std::cout << pos << " eval zł: " << eval << std::endl;
     return eval;
 }
 
@@ -153,9 +155,13 @@ std::string search_best_move(ChessNet &model, std::string pos, int depth)
     // std::cout << "pos " << positions[1] << std::endl;
     for (const auto &new_pos : positions)
     {
-        float eval = alpha_beta(model, new_pos, depth - 1, std::numeric_limits<float>::min(), std::numeric_limits<float>::max(), !isWhite_var);
+        // float eval = alpha_beta(model, new_pos, depth - 1, std::numeric_limits<float>::min(), std::numeric_limits<float>::max(), !isWhite_var);
+        std::cout << "Evaluating position: " << new_pos << std::endl;
+        float eval = _PerfT(new_pos, depth - 1, std::numeric_limits<float>::min(), std::numeric_limits<float>::max(), model);
         if (isWhite_var)
         {
+
+            // best_eval = std::max(best_eval, eval);
             if (eval > best_eval)
             {
                 best_eval = eval;
@@ -163,7 +169,8 @@ std::string search_best_move(ChessNet &model, std::string pos, int depth)
             }
         }
         else
-        {
+        {   
+            // best_eval = std::min(best_eval, eval);
             if (eval < best_eval)
             {
                 best_eval = eval;

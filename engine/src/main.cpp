@@ -67,7 +67,7 @@ void handle_connection(int client_socket) {
 
         // Get the best move FEN from the model
         auto start_time = std::chrono::high_resolution_clock::now();
-        std::string best_move_fen = search_best_move(model, received_fen, 3);  // Depth set to 2 for example
+        std::string best_move_fen = search_best_move(model, received_fen, 4);  // Depth set to 2 for example
         auto end_time = std::chrono::high_resolution_clock::now();
         std::chrono::duration<float> duration = end_time - start_time;
         std::cout << "Time taken to find best move: " << duration.count() << " seconds." << std::endl;

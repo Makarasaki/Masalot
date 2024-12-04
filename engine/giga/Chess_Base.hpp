@@ -740,7 +740,7 @@ static std::string _map(uint64_t val1, uint64_t val2, const Board& val3, const B
 /// Call this via _func(brd)
 /// </summary>
 #define PositionToTemplate(func) \
-static inline float _##func(std::string_view pos, int depth, float alpha, float beta) { \
+static inline float _##func(std::string_view pos, int depth, float alpha, float beta, ChessNet &model) { \
 const bool WH = FEN::FenInfo<FenField::white>(pos);\
 const bool EP = FEN::FenInfo<FenField::hasEP>(pos);\
 const bool BL = FEN::FenInfo<FenField::BCastleL>(pos);\
@@ -748,71 +748,71 @@ const bool BR = FEN::FenInfo<FenField::BCastleR>(pos);\
 const bool WL = FEN::FenInfo<FenField::WCastleL>(pos);\
 const bool WR = FEN::FenInfo<FenField::WCastleR>(pos);\
 Board brd(pos);\
-if ( WH &&  EP &&  WL &&  WR &&  BL &&  BR)       return func<BoardStatus(0b111111)>(pos, brd, depth, alpha, beta); \
-if ( WH &&  EP &&  WL &&  WR &&  BL && !BR)       return func<BoardStatus(0b111110)>(pos, brd, depth, alpha, beta); \
-if ( WH &&  EP &&  WL &&  WR && !BL &&  BR)       return func<BoardStatus(0b111101)>(pos, brd, depth, alpha, beta); \
-if ( WH &&  EP &&  WL &&  WR && !BL && !BR)       return func<BoardStatus(0b111100)>(pos, brd, depth, alpha, beta); \
-if ( WH &&  EP &&  WL && !WR &&  BL &&  BR)       return func<BoardStatus(0b111011)>(pos, brd, depth, alpha, beta); \
-if ( WH &&  EP &&  WL && !WR &&  BL && !BR)       return func<BoardStatus(0b111010)>(pos, brd, depth, alpha, beta); \
-if ( WH &&  EP &&  WL && !WR && !BL &&  BR)       return func<BoardStatus(0b111001)>(pos, brd, depth, alpha, beta); \
-if ( WH &&  EP &&  WL && !WR && !BL && !BR)       return func<BoardStatus(0b111000)>(pos, brd, depth, alpha, beta); \
-if ( WH &&  EP && !WL &&  WR &&  BL &&  BR)       return func<BoardStatus(0b110111)>(pos, brd, depth, alpha, beta); \
-if ( WH &&  EP && !WL &&  WR &&  BL && !BR)       return func<BoardStatus(0b110110)>(pos, brd, depth, alpha, beta); \
-if ( WH &&  EP && !WL &&  WR && !BL &&  BR)       return func<BoardStatus(0b110101)>(pos, brd, depth, alpha, beta); \
-if ( WH &&  EP && !WL &&  WR && !BL && !BR)       return func<BoardStatus(0b110100)>(pos, brd, depth, alpha, beta); \
-if ( WH &&  EP && !WL && !WR &&  BL &&  BR)       return func<BoardStatus(0b110011)>(pos, brd, depth, alpha, beta); \
-if ( WH &&  EP && !WL && !WR &&  BL && !BR)       return func<BoardStatus(0b110010)>(pos, brd, depth, alpha, beta); \
-if ( WH &&  EP && !WL && !WR && !BL &&  BR)       return func<BoardStatus(0b110001)>(pos, brd, depth, alpha, beta); \
-if ( WH &&  EP && !WL && !WR && !BL && !BR)       return func<BoardStatus(0b110000)>(pos, brd, depth, alpha, beta); \
-if ( WH && !EP &&  WL &&  WR &&  BL &&  BR)       return func<BoardStatus(0b101111)>(pos, brd, depth, alpha, beta); \
-if ( WH && !EP &&  WL &&  WR &&  BL && !BR)       return func<BoardStatus(0b101110)>(pos, brd, depth, alpha, beta); \
-if ( WH && !EP &&  WL &&  WR && !BL &&  BR)       return func<BoardStatus(0b101101)>(pos, brd, depth, alpha, beta); \
-if ( WH && !EP &&  WL &&  WR && !BL && !BR)       return func<BoardStatus(0b101100)>(pos, brd, depth, alpha, beta); \
-if ( WH && !EP &&  WL && !WR &&  BL &&  BR)       return func<BoardStatus(0b101011)>(pos, brd, depth, alpha, beta); \
-if ( WH && !EP &&  WL && !WR &&  BL && !BR)       return func<BoardStatus(0b101010)>(pos, brd, depth, alpha, beta); \
-if ( WH && !EP &&  WL && !WR && !BL &&  BR)       return func<BoardStatus(0b101001)>(pos, brd, depth, alpha, beta); \
-if ( WH && !EP &&  WL && !WR && !BL && !BR)       return func<BoardStatus(0b101000)>(pos, brd, depth, alpha, beta); \
-if ( WH && !EP && !WL &&  WR &&  BL &&  BR)       return func<BoardStatus(0b100111)>(pos, brd, depth, alpha, beta); \
-if ( WH && !EP && !WL &&  WR &&  BL && !BR)       return func<BoardStatus(0b100110)>(pos, brd, depth, alpha, beta); \
-if ( WH && !EP && !WL &&  WR && !BL &&  BR)       return func<BoardStatus(0b100101)>(pos, brd, depth, alpha, beta); \
-if ( WH && !EP && !WL &&  WR && !BL && !BR)       return func<BoardStatus(0b100100)>(pos, brd, depth, alpha, beta); \
-if ( WH && !EP && !WL && !WR &&  BL &&  BR)       return func<BoardStatus(0b100011)>(pos, brd, depth, alpha, beta); \
-if ( WH && !EP && !WL && !WR &&  BL && !BR)       return func<BoardStatus(0b100010)>(pos, brd, depth, alpha, beta); \
-if ( WH && !EP && !WL && !WR && !BL &&  BR)       return func<BoardStatus(0b100001)>(pos, brd, depth, alpha, beta); \
-if ( WH && !EP && !WL && !WR && !BL && !BR)       return func<BoardStatus(0b100000)>(pos, brd, depth, alpha, beta); \
-if (!WH &&  EP &&  WL &&  WR &&  BL &&  BR)       return func<BoardStatus(0b011111)>(pos, brd, depth, alpha, beta); \
-if (!WH &&  EP &&  WL &&  WR &&  BL && !BR)       return func<BoardStatus(0b011110)>(pos, brd, depth, alpha, beta); \
-if (!WH &&  EP &&  WL &&  WR && !BL &&  BR)       return func<BoardStatus(0b011101)>(pos, brd, depth, alpha, beta); \
-if (!WH &&  EP &&  WL &&  WR && !BL && !BR)       return func<BoardStatus(0b011100)>(pos, brd, depth, alpha, beta); \
-if (!WH &&  EP &&  WL && !WR &&  BL &&  BR)       return func<BoardStatus(0b011011)>(pos, brd, depth, alpha, beta); \
-if (!WH &&  EP &&  WL && !WR &&  BL && !BR)       return func<BoardStatus(0b011010)>(pos, brd, depth, alpha, beta); \
-if (!WH &&  EP &&  WL && !WR && !BL &&  BR)       return func<BoardStatus(0b011001)>(pos, brd, depth, alpha, beta); \
-if (!WH &&  EP &&  WL && !WR && !BL && !BR)       return func<BoardStatus(0b011000)>(pos, brd, depth, alpha, beta); \
-if (!WH &&  EP && !WL &&  WR &&  BL &&  BR)       return func<BoardStatus(0b010111)>(pos, brd, depth, alpha, beta); \
-if (!WH &&  EP && !WL &&  WR &&  BL && !BR)       return func<BoardStatus(0b010110)>(pos, brd, depth, alpha, beta); \
-if (!WH &&  EP && !WL &&  WR && !BL &&  BR)       return func<BoardStatus(0b010101)>(pos, brd, depth, alpha, beta); \
-if (!WH &&  EP && !WL &&  WR && !BL && !BR)       return func<BoardStatus(0b010100)>(pos, brd, depth, alpha, beta); \
-if (!WH &&  EP && !WL && !WR &&  BL &&  BR)       return func<BoardStatus(0b010011)>(pos, brd, depth, alpha, beta); \
-if (!WH &&  EP && !WL && !WR &&  BL && !BR)       return func<BoardStatus(0b010010)>(pos, brd, depth, alpha, beta); \
-if (!WH &&  EP && !WL && !WR && !BL &&  BR)       return func<BoardStatus(0b010001)>(pos, brd, depth, alpha, beta); \
-if (!WH &&  EP && !WL && !WR && !BL && !BR)       return func<BoardStatus(0b010000)>(pos, brd, depth, alpha, beta); \
-if (!WH && !EP &&  WL &&  WR &&  BL &&  BR)       return func<BoardStatus(0b001111)>(pos, brd, depth, alpha, beta); \
-if (!WH && !EP &&  WL &&  WR &&  BL && !BR)       return func<BoardStatus(0b001110)>(pos, brd, depth, alpha, beta); \
-if (!WH && !EP &&  WL &&  WR && !BL &&  BR)       return func<BoardStatus(0b001101)>(pos, brd, depth, alpha, beta); \
-if (!WH && !EP &&  WL &&  WR && !BL && !BR)       return func<BoardStatus(0b001100)>(pos, brd, depth, alpha, beta); \
-if (!WH && !EP &&  WL && !WR &&  BL &&  BR)       return func<BoardStatus(0b001011)>(pos, brd, depth, alpha, beta); \
-if (!WH && !EP &&  WL && !WR &&  BL && !BR)       return func<BoardStatus(0b001010)>(pos, brd, depth, alpha, beta); \
-if (!WH && !EP &&  WL && !WR && !BL &&  BR)       return func<BoardStatus(0b001001)>(pos, brd, depth, alpha, beta); \
-if (!WH && !EP &&  WL && !WR && !BL && !BR)       return func<BoardStatus(0b001000)>(pos, brd, depth, alpha, beta); \
-if (!WH && !EP && !WL &&  WR &&  BL &&  BR)       return func<BoardStatus(0b000111)>(pos, brd, depth, alpha, beta); \
-if (!WH && !EP && !WL &&  WR &&  BL && !BR)       return func<BoardStatus(0b000110)>(pos, brd, depth, alpha, beta); \
-if (!WH && !EP && !WL &&  WR && !BL &&  BR)       return func<BoardStatus(0b000101)>(pos, brd, depth, alpha, beta); \
-if (!WH && !EP && !WL &&  WR && !BL && !BR)       return func<BoardStatus(0b000100)>(pos, brd, depth, alpha, beta); \
-if (!WH && !EP && !WL && !WR &&  BL &&  BR)       return func<BoardStatus(0b000011)>(pos, brd, depth, alpha, beta); \
-if (!WH && !EP && !WL && !WR &&  BL && !BR)       return func<BoardStatus(0b000010)>(pos, brd, depth, alpha, beta); \
-if (!WH && !EP && !WL && !WR && !BL &&  BR)       return func<BoardStatus(0b000001)>(pos, brd, depth, alpha, beta); \
-if (!WH && !EP && !WL && !WR && !BL && !BR)       return func<BoardStatus(0b000000)>(pos, brd, depth, alpha, beta); \
-return func<BoardStatus::Default()>(pos, brd, depth, alpha, beta);}
+if ( WH &&  EP &&  WL &&  WR &&  BL &&  BR)       return func<BoardStatus(0b111111)>(pos, brd, depth, alpha, beta, model); \
+if ( WH &&  EP &&  WL &&  WR &&  BL && !BR)       return func<BoardStatus(0b111110)>(pos, brd, depth, alpha, beta, model); \
+if ( WH &&  EP &&  WL &&  WR && !BL &&  BR)       return func<BoardStatus(0b111101)>(pos, brd, depth, alpha, beta, model); \
+if ( WH &&  EP &&  WL &&  WR && !BL && !BR)       return func<BoardStatus(0b111100)>(pos, brd, depth, alpha, beta, model); \
+if ( WH &&  EP &&  WL && !WR &&  BL &&  BR)       return func<BoardStatus(0b111011)>(pos, brd, depth, alpha, beta, model); \
+if ( WH &&  EP &&  WL && !WR &&  BL && !BR)       return func<BoardStatus(0b111010)>(pos, brd, depth, alpha, beta, model); \
+if ( WH &&  EP &&  WL && !WR && !BL &&  BR)       return func<BoardStatus(0b111001)>(pos, brd, depth, alpha, beta, model); \
+if ( WH &&  EP &&  WL && !WR && !BL && !BR)       return func<BoardStatus(0b111000)>(pos, brd, depth, alpha, beta, model); \
+if ( WH &&  EP && !WL &&  WR &&  BL &&  BR)       return func<BoardStatus(0b110111)>(pos, brd, depth, alpha, beta, model); \
+if ( WH &&  EP && !WL &&  WR &&  BL && !BR)       return func<BoardStatus(0b110110)>(pos, brd, depth, alpha, beta, model); \
+if ( WH &&  EP && !WL &&  WR && !BL &&  BR)       return func<BoardStatus(0b110101)>(pos, brd, depth, alpha, beta, model); \
+if ( WH &&  EP && !WL &&  WR && !BL && !BR)       return func<BoardStatus(0b110100)>(pos, brd, depth, alpha, beta, model); \
+if ( WH &&  EP && !WL && !WR &&  BL &&  BR)       return func<BoardStatus(0b110011)>(pos, brd, depth, alpha, beta, model); \
+if ( WH &&  EP && !WL && !WR &&  BL && !BR)       return func<BoardStatus(0b110010)>(pos, brd, depth, alpha, beta, model); \
+if ( WH &&  EP && !WL && !WR && !BL &&  BR)       return func<BoardStatus(0b110001)>(pos, brd, depth, alpha, beta, model); \
+if ( WH &&  EP && !WL && !WR && !BL && !BR)       return func<BoardStatus(0b110000)>(pos, brd, depth, alpha, beta, model); \
+if ( WH && !EP &&  WL &&  WR &&  BL &&  BR)       return func<BoardStatus(0b101111)>(pos, brd, depth, alpha, beta, model); \
+if ( WH && !EP &&  WL &&  WR &&  BL && !BR)       return func<BoardStatus(0b101110)>(pos, brd, depth, alpha, beta, model); \
+if ( WH && !EP &&  WL &&  WR && !BL &&  BR)       return func<BoardStatus(0b101101)>(pos, brd, depth, alpha, beta, model); \
+if ( WH && !EP &&  WL &&  WR && !BL && !BR)       return func<BoardStatus(0b101100)>(pos, brd, depth, alpha, beta, model); \
+if ( WH && !EP &&  WL && !WR &&  BL &&  BR)       return func<BoardStatus(0b101011)>(pos, brd, depth, alpha, beta, model); \
+if ( WH && !EP &&  WL && !WR &&  BL && !BR)       return func<BoardStatus(0b101010)>(pos, brd, depth, alpha, beta, model); \
+if ( WH && !EP &&  WL && !WR && !BL &&  BR)       return func<BoardStatus(0b101001)>(pos, brd, depth, alpha, beta, model); \
+if ( WH && !EP &&  WL && !WR && !BL && !BR)       return func<BoardStatus(0b101000)>(pos, brd, depth, alpha, beta, model); \
+if ( WH && !EP && !WL &&  WR &&  BL &&  BR)       return func<BoardStatus(0b100111)>(pos, brd, depth, alpha, beta, model); \
+if ( WH && !EP && !WL &&  WR &&  BL && !BR)       return func<BoardStatus(0b100110)>(pos, brd, depth, alpha, beta, model); \
+if ( WH && !EP && !WL &&  WR && !BL &&  BR)       return func<BoardStatus(0b100101)>(pos, brd, depth, alpha, beta, model); \
+if ( WH && !EP && !WL &&  WR && !BL && !BR)       return func<BoardStatus(0b100100)>(pos, brd, depth, alpha, beta, model); \
+if ( WH && !EP && !WL && !WR &&  BL &&  BR)       return func<BoardStatus(0b100011)>(pos, brd, depth, alpha, beta, model); \
+if ( WH && !EP && !WL && !WR &&  BL && !BR)       return func<BoardStatus(0b100010)>(pos, brd, depth, alpha, beta, model); \
+if ( WH && !EP && !WL && !WR && !BL &&  BR)       return func<BoardStatus(0b100001)>(pos, brd, depth, alpha, beta, model); \
+if ( WH && !EP && !WL && !WR && !BL && !BR)       return func<BoardStatus(0b100000)>(pos, brd, depth, alpha, beta, model); \
+if (!WH &&  EP &&  WL &&  WR &&  BL &&  BR)       return func<BoardStatus(0b011111)>(pos, brd, depth, alpha, beta, model); \
+if (!WH &&  EP &&  WL &&  WR &&  BL && !BR)       return func<BoardStatus(0b011110)>(pos, brd, depth, alpha, beta, model); \
+if (!WH &&  EP &&  WL &&  WR && !BL &&  BR)       return func<BoardStatus(0b011101)>(pos, brd, depth, alpha, beta, model); \
+if (!WH &&  EP &&  WL &&  WR && !BL && !BR)       return func<BoardStatus(0b011100)>(pos, brd, depth, alpha, beta, model); \
+if (!WH &&  EP &&  WL && !WR &&  BL &&  BR)       return func<BoardStatus(0b011011)>(pos, brd, depth, alpha, beta, model); \
+if (!WH &&  EP &&  WL && !WR &&  BL && !BR)       return func<BoardStatus(0b011010)>(pos, brd, depth, alpha, beta, model); \
+if (!WH &&  EP &&  WL && !WR && !BL &&  BR)       return func<BoardStatus(0b011001)>(pos, brd, depth, alpha, beta, model); \
+if (!WH &&  EP &&  WL && !WR && !BL && !BR)       return func<BoardStatus(0b011000)>(pos, brd, depth, alpha, beta, model); \
+if (!WH &&  EP && !WL &&  WR &&  BL &&  BR)       return func<BoardStatus(0b010111)>(pos, brd, depth, alpha, beta, model); \
+if (!WH &&  EP && !WL &&  WR &&  BL && !BR)       return func<BoardStatus(0b010110)>(pos, brd, depth, alpha, beta, model); \
+if (!WH &&  EP && !WL &&  WR && !BL &&  BR)       return func<BoardStatus(0b010101)>(pos, brd, depth, alpha, beta, model); \
+if (!WH &&  EP && !WL &&  WR && !BL && !BR)       return func<BoardStatus(0b010100)>(pos, brd, depth, alpha, beta, model); \
+if (!WH &&  EP && !WL && !WR &&  BL &&  BR)       return func<BoardStatus(0b010011)>(pos, brd, depth, alpha, beta, model); \
+if (!WH &&  EP && !WL && !WR &&  BL && !BR)       return func<BoardStatus(0b010010)>(pos, brd, depth, alpha, beta, model); \
+if (!WH &&  EP && !WL && !WR && !BL &&  BR)       return func<BoardStatus(0b010001)>(pos, brd, depth, alpha, beta, model); \
+if (!WH &&  EP && !WL && !WR && !BL && !BR)       return func<BoardStatus(0b010000)>(pos, brd, depth, alpha, beta, model); \
+if (!WH && !EP &&  WL &&  WR &&  BL &&  BR)       return func<BoardStatus(0b001111)>(pos, brd, depth, alpha, beta, model); \
+if (!WH && !EP &&  WL &&  WR &&  BL && !BR)       return func<BoardStatus(0b001110)>(pos, brd, depth, alpha, beta, model); \
+if (!WH && !EP &&  WL &&  WR && !BL &&  BR)       return func<BoardStatus(0b001101)>(pos, brd, depth, alpha, beta, model); \
+if (!WH && !EP &&  WL &&  WR && !BL && !BR)       return func<BoardStatus(0b001100)>(pos, brd, depth, alpha, beta, model); \
+if (!WH && !EP &&  WL && !WR &&  BL &&  BR)       return func<BoardStatus(0b001011)>(pos, brd, depth, alpha, beta, model); \
+if (!WH && !EP &&  WL && !WR &&  BL && !BR)       return func<BoardStatus(0b001010)>(pos, brd, depth, alpha, beta, model); \
+if (!WH && !EP &&  WL && !WR && !BL &&  BR)       return func<BoardStatus(0b001001)>(pos, brd, depth, alpha, beta, model); \
+if (!WH && !EP &&  WL && !WR && !BL && !BR)       return func<BoardStatus(0b001000)>(pos, brd, depth, alpha, beta, model); \
+if (!WH && !EP && !WL &&  WR &&  BL &&  BR)       return func<BoardStatus(0b000111)>(pos, brd, depth, alpha, beta, model); \
+if (!WH && !EP && !WL &&  WR &&  BL && !BR)       return func<BoardStatus(0b000110)>(pos, brd, depth, alpha, beta, model); \
+if (!WH && !EP && !WL &&  WR && !BL &&  BR)       return func<BoardStatus(0b000101)>(pos, brd, depth, alpha, beta, model); \
+if (!WH && !EP && !WL &&  WR && !BL && !BR)       return func<BoardStatus(0b000100)>(pos, brd, depth, alpha, beta, model); \
+if (!WH && !EP && !WL && !WR &&  BL &&  BR)       return func<BoardStatus(0b000011)>(pos, brd, depth, alpha, beta, model); \
+if (!WH && !EP && !WL && !WR &&  BL && !BR)       return func<BoardStatus(0b000010)>(pos, brd, depth, alpha, beta, model); \
+if (!WH && !EP && !WL && !WR && !BL &&  BR)       return func<BoardStatus(0b000001)>(pos, brd, depth, alpha, beta, model); \
+if (!WH && !EP && !WL && !WR && !BL && !BR)       return func<BoardStatus(0b000000)>(pos, brd, depth, alpha, beta, model); \
+return func<BoardStatus::Default()>(pos, brd, depth, alpha, beta, model);}
 
 
 //#define StatusToTemplate(func) \

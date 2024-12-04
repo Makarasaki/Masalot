@@ -5,7 +5,7 @@
 #include <vector>
 #include <cstdint>
 #include <string>
-#include "../include/chessnet.h"
+#include "../../training/include/chessnet.h"
 #include "../include/data_preparation.h"
 
 

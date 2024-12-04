@@ -77,15 +77,25 @@ find_package(Torch REQUIRED)
 set(CMAKE_CUDA_COMPILER /usr/local/cuda/bin/nvcc)
 
 # Include directories for headers
-include_directories(${PROJECT_SOURCE_DIR}/include)
+# include_directories(${PROJECT_SOURCE_DIR}/include)
 
 # Add your source files and set the output name to "Masalot"
 add_executable(
     Masalot
     src/data_preparation.cpp
-    src/chessnet.cpp
+    ../training/src/chessnet.cpp
+    # giga/Gigantua.cpp
     src/evaluate.cpp
     src/main.cpp
+)
+
+target_include_directories(
+    Masalot PRIVATE 
+    ${PROJECT_SOURCE_DIR}/include
+    ${PROJECT_SOURCE_DIR}/giga
+    ${CUDNN_INCLUDE_DIR}
+    # Add other include directories here
+    ${PROJECT_SOURCE_DIR}/../training/include
 )
 
 # Prefer pthreads for multithreading support
@@ -111,6 +121,12 @@ set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
 # Additional linker flags for libtorch
 target_compile_features(Masalot PRIVATE cxx_std_20)
+
+if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR
+    CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang" OR
+    CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    target_compile_options(Masalot PRIVATE -march=native -mbmi -mbmi2)
+endif()
 
 # Add this to ~/.zshrc
 # export CUDA_HOME=/usr/local/cuda

@@ -17,5 +17,9 @@ torch::Tensor bitboardsToTensor(const std::vector<std::vector<std::vector<int>>>
 
 std::vector<std::vector<int>> intToBitboard(uint64_t bitboard) ;
 
+std::vector<std::vector<int>> intToBitboardWhites(uint64_t bitboard) ;
+
+std::vector<std::vector<int>> intToBitboardBlacks(uint64_t bitboard) ;
+
 
 #endif  // DATA_PREPARATION_H
