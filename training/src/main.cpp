@@ -38,18 +38,19 @@ int main()
 
     // Instantiate model and move it to the chosen device
     ChessNet net;
-    net.to(device);
     // std::cout<<"0"<<std::endl;
-    // torch::optim::Adam optimizer(net.parameters(), torch::optim::AdamOptions(1e-5));
-    torch::optim::SGD optimizer(net.parameters(), torch::optim::SGDOptions(1e-1).momentum(0.9).weight_decay(1e-4));
-    torch::optim::StepLR scheduler(optimizer, /*step_size=*/6000, /*gamma=*/0.1);
+    torch::optim::Adam optimizer(net.parameters(), torch::optim::AdamOptions(1e-3));
+    // torch::optim::SGD optimizer(net.parameters(), torch::optim::SGDOptions(1e-1).momentum(0.9).weight_decay(1e-4));
+    // torch::optim::StepLR scheduler(optimizer, /*step_size=*/6000, /*gamma=*/0.1);
 
     const int batch_size = 512;
     const int num_epochs = 23437;
-
+    const float alpha = 0.1; // Hyperparameter to encourage range utilization
     float min_loss = std::numeric_limits<float>::max(); // Track the minimum loss
     std::string model_path = "../NN_weights/best_model.pt";
 
+
+    net.to(device);
     for (int epoch = 0; epoch < num_epochs; ++epoch)
     {
         auto start_time = std::chrono::high_resolution_clock::now();
@@ -75,18 +76,22 @@ int main()
         auto target_tensor = torch::stack(targets);
 
         std::cout << "Target avg: " << target_tensor.mean().item().toFloat() << std::endl;
-        std::cout << "Target max: " << target_tensor.max().item().toFloat() << std::endl;
-        std::cout << "Target min: " << target_tensor.min().item().toFloat() << std::endl;
+        std::cout << "Target range: " << target_tensor.min().item().toFloat() << " to " << target_tensor.max().item().toFloat() << std::endl;
 
         optimizer.zero_grad();
 
         auto output = net.forward(input_tensor);
 
-        auto loss = torch::l1_loss(output.squeeze(), target_tensor);
+        // auto loss = torch::l1_loss(output.squeeze(), target_tensor);
+        // auto loss = torch::mse_loss(output.squeeze(), target_tensor);
+        auto mse_loss = torch::mse_loss(output.squeeze(), target_tensor);
+        auto range_penalty = torch::mean(torch::abs(output)); // Encourages output range utilization
+        auto loss = mse_loss + alpha * range_penalty;
 
         loss.backward();
-        torch::nn::utils::clip_grad_norm_(net.parameters(), 1.0);
+        // torch::nn::utils::clip_grad_norm_(net.parameters(), 1.0);
         optimizer.step();
+        // scheduler.step();
 
         float current_loss = loss.item<float>();
 
