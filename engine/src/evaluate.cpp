@@ -183,7 +183,8 @@ std::string search_best_move(ChessNet &model, std::string pos, int depth)
 }
 
 
-// Time taken to find best move: 1107.04 seconds.
+
+// Time taken to find best move: 178.041 seconds. depth = 4
 // std::string search_best_move(ChessNet &model, const std::string pos, int depth)
 // {
 //     bool isWhite_var = isWhite(pos);
@@ -200,10 +201,8 @@ std::string search_best_move(ChessNet &model, std::string pos, int depth)
 //     {
 //         // Launch each evaluation in a separate asynchronous task
 //         futures.push_back(std::async(std::launch::async, [&model, new_pos, depth, isWhite_var]() {
-//             float eval = alpha_beta(model, new_pos, depth - 1,
-//                                     std::numeric_limits<float>::min(),
-//                                     std::numeric_limits<float>::max(),
-//                                     !isWhite_var);
+//             float eval = _PerfT(new_pos, depth - 1, std::numeric_limits<float>::min(), std::numeric_limits<float>::max(), model);
+//             std::cout << "nodes: " << MoveReciever::nodes << std::endl;
 //             return std::make_pair(eval, new_pos);
 //         }));
 //     }

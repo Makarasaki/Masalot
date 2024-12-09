@@ -23,6 +23,10 @@ public:
 	static _ForceInline void Init(Board& brd, uint64_t EPInit, ChessNet &trained_model) {
 		MoveReciever::nodes = 0;
 		MoveReciever::model = trained_model;
+		if (torch::cuda::is_available()) {
+            model.to(torch::kCUDA);
+            std::cout << "Using CUDA" << std::endl;
+        }
 		Movelist::Init(EPInit);
 	}
 
@@ -84,45 +88,44 @@ public:
 	static _ForceInline float evaluate(Board& brd)
 	{
 
-		auto start_time = std::chrono::high_resolution_clock::now();
-        ChessData positionInBitboards = positionToBitboards<status>(brd);
-        auto end_time = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<float> duration = end_time - start_time;
-        std::cout << "Time taken positionToBitboards: " << duration.count() << " seconds." << std::endl;
+		// auto start_time = std::chrono::high_resolution_clock::now();
+        // ChessData positionInBitboards = positionToBitboards<status>(brd);
+        // auto end_time = std::chrono::high_resolution_clock::now();
+        // std::chrono::duration<float> duration = end_time - start_time;
+        // std::cout << "Time taken positionToBitboards: " << duration.count() << " seconds." << std::endl;
 
-		start_time = std::chrono::high_resolution_clock::now();
-        torch::Tensor positionINTensor = bitboardsToTensor(positionInBitboards.bitboards);
-        end_time = std::chrono::high_resolution_clock::now();
-        duration = end_time - start_time;
-        std::cout << "Time taken bitboardsToTensor: " << duration.count() << " seconds." << std::endl;
+		// start_time = std::chrono::high_resolution_clock::now();
+        // torch::Tensor positionINTensor = bitboardsToTensor(positionInBitboards.bitboards);
+        // end_time = std::chrono::high_resolution_clock::now();
+        // duration = end_time - start_time;
+        // std::cout << "Time taken bitboardsToTensor: " << duration.count() << " seconds." << std::endl;
 
-		positionINTensor = positionINTensor.unsqueeze(0);
-		if (torch::cuda::is_available()) {
-			std::cout << "using cuda" << std::endl;
-			positionINTensor = positionINTensor.to(torch::kCUDA);
-		}
-
-
-		start_time = std::chrono::high_resolution_clock::now();
-        torch::Tensor output = model.forward(positionINTensor);
-        end_time = std::chrono::high_resolution_clock::now();
-        duration = end_time - start_time;
-        std::cout << "Time taken forward: " << duration.count() << " seconds." << std::endl;
-
-
-		// Convert the FEN position to bitboards and then to a tensor
-		// ChessData positionInBitboards = positionToBitboards<status>(brd);
-		// torch::Tensor positionINTensor = bitboardsToTensor(positionInBitboards.bitboards);
-		// Reshape input tensor to [1, 14, 8, 8] for batch processing
 		// positionINTensor = positionINTensor.unsqueeze(0);
-
-		// Check if CUDA is available
 		// if (torch::cuda::is_available()) {
 		// 	std::cout << "using cuda" << std::endl;
 		// 	positionINTensor = positionINTensor.to(torch::kCUDA);
 		// }
+
+
+		// start_time = std::chrono::high_resolution_clock::now();
+        // torch::Tensor output = model.forward(positionINTensor);
+        // end_time = std::chrono::high_resolution_clock::now();
+        // duration = end_time - start_time;
+        // std::cout << "Time taken forward: " << duration.count() << " seconds." << std::endl;
+
+
+		// Convert the FEN position to bitboards and then to a tensor
+		ChessData positionInBitboards = positionToBitboards<status>(brd);
+		torch::Tensor positionINTensor = bitboardsToTensor(positionInBitboards.bitboards);
+		// Reshape input tensor to [1, 14, 8, 8] for batch processing
+		positionINTensor = positionINTensor.unsqueeze(0);
+
+		// Check if CUDA is available
+		if (torch::cuda::is_available()) {
+			positionINTensor = positionINTensor.to(torch::kCUDA);
+		}
 		// Forward pass
-		// torch::Tensor output = model.forward(positionINTensor);
+		torch::Tensor output = model.forward(positionINTensor);
 
 		// Print the evaluation and return
 		// std::cout << "eval: " << output.item<float>(); << std::endl;
@@ -135,8 +138,8 @@ public:
 		//std::cout << "Status PERFT0" << std::endl;
 		nodes++;
 		//return 0;
-		float eval = evaluate<status>(brd);
-		eval = static_cast<float>(rand()) / (static_cast<float>(RAND_MAX) / 2.0f) - 1.0f;//std::cout << "eval: " << eval << std::endl;
+		// float eval = evaluate<status>(brd);
+		float eval = static_cast<float>(rand()) / (static_cast<float>(RAND_MAX) / 2.0f) - 1.0f;//std::cout << "eval: " << eval << std::endl;
 		return eval;
 	}
 	

@@ -25,6 +25,7 @@ void handle_connection(int client_socket) {
         // Check if CUDA is available
         if (torch::cuda::is_available()) {
             model.to(torch::kCUDA);
+            std::cout << "Using CUDA" << std::endl;
         } else {
             // If not available, keep on CPU
             model.to(torch::kCPU);

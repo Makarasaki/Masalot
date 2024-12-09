@@ -580,11 +580,11 @@ namespace Movelist {
                     }
                 }
                 if (value < -1) {
-                    std::cout << "Checkmate detected for black bitloop" << std::endl;
+                    // std::cout << "Checkmate detected for black bitloop" << std::endl;
                     return -1;
                 }
                 return value;
-                std::cout << "Tu nie powinno wpaœæ" << std::endl;
+                std::cout << "Tu nie powinno wpaï¿½ï¿½" << std::endl;
             }
             else {
                 float value = std::numeric_limits<float>::max();
@@ -602,11 +602,11 @@ namespace Movelist {
                     }
                 }
                 if (value > 1) {
-                    std::cout << "Checkmate detected for white bitloop" << std::endl;
+                    // std::cout << "Checkmate detected for white bitloop" << std::endl;
                     return 1;
                 }
                 return value;
-                std::cout << "Tu nie powinno wpaœæ" << std::endl;
+                std::cout << "Tu nie powinno wpaï¿½ï¿½" << std::endl;
             }
             //SORT EVALUATION ASCENDING OR DESCENDING, DEPENDS ON STATUS AND RETURN ONE
             //Implement vector of evaluations from bitloop
@@ -1095,7 +1095,7 @@ namespace Movelist {
             return 0;
         }
         if (value < -1) {
-            std::cout << "Checkmate detected for black" << std::endl;
+            // std::cout << "Checkmate detected for black" << std::endl;
             return -1;
         }
 
@@ -1681,7 +1681,7 @@ namespace Movelist {
             return 0;
         }
         if (value > 1) {
-            std::cout << "Checkmate detected for white" << std::endl;
+            // std::cout << "Checkmate detected for white" << std::endl;
             return 1;
         }
 
