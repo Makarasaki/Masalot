@@ -1,7 +1,7 @@
 #include "../include/chessnet.h"
 #include <iostream>
 
-ChessNet::ChessNet() : conv1(torch::nn::Conv2dOptions(18, 64, 3).stride(1).padding(1)),
+ChessNet::ChessNet() : conv1(torch::nn::Conv2dOptions(13, 64, 3).stride(1).padding(1)),
                        conv2(torch::nn::Conv2dOptions(64, 128, 3).stride(1).padding(1)),
                        conv3(torch::nn::Conv2dOptions(128, 256, 3).stride(1).padding(1)),
                        conv4(torch::nn::Conv2dOptions(256, 512, 3).stride(1).padding(1)),
@@ -38,6 +38,7 @@ ChessNet::ChessNet() : conv1(torch::nn::Conv2dOptions(18, 64, 3).stride(1).paddi
 
 torch::Tensor ChessNet::forward(torch::Tensor x)
 {
+    // std::cout << x[0] << std::endl;
     // Apply convolutional layers with BatchNorm and Tanh activation
     if (x.size(0) == 1)
     {
@@ -56,40 +57,63 @@ torch::Tensor ChessNet::forward(torch::Tensor x)
         fc3_bn->train();
     }
 
-    x = torch::tanh(bn1(conv1(x)));
-    x = torch::tanh(bn2(conv2(x)));
-    x = torch::tanh(bn3(conv3(x)));
-    x = torch::tanh(bn4(conv4(x)));
+    x = torch::relu(bn1(conv1(x)));
+    x = torch::relu(bn2(conv2(x)));
+    x = torch::relu(bn3(conv3(x)));
+    x = torch::relu(bn4(conv4(x)));
 
-    // Flatten the output for fully connected layers
     x = x.view({-1, 512 * 8 * 8});
     x = conv_flat_bn(x);
 
-    // Apply first fully connected layer with BatchNorm and Tanh
-    x = torch::tanh(fc1_bn(fc1(x)));
+    x = torch::relu(fc1_bn(fc1(x)));
 
-    // Apply second fully connected layer with BatchNorm and Tanh
-    x = torch::tanh(fc2_bn(fc2(x)));
+    x = torch::relu(fc2_bn(fc2(x)));
     // std::cout << "fc2 output range: " << x.min().item().toFloat() << " to " << x.max().item().toFloat() << std::endl;
 
-    // Final layer with Tanh to map output to range [-1, 1]
     x = torch::tanh(fc3_bn(fc3(x)));
-    // std::cout << "output avg: " << x.mean().item().toFloat() << std::endl;
-    // std::cout << "output range: " << x.min().item().toFloat() << " to " << x.max().item().toFloat() << std::endl;
+    std::cout << "output avg: " << x.mean().item().toFloat() << std::endl;
+    std::cout << "output range: " << x.min().item().toFloat() << " to " << x.max().item().toFloat() << std::endl;
 
     return x;
 }
 
-torch::Tensor bitboards_to_tensor(const std::vector<std::vector<std::vector<int>>> &bitboards)
-{
-    std::vector<torch::Tensor> channels;
-    for (const auto &board : bitboards)
-    {
-        torch::Tensor board_tensor = torch::from_blob(const_cast<int *>(board[0].data()), {8, 8}, torch::kInt32).clone();
-        channels.push_back(board_tensor.unsqueeze(0));
-    }
+// torch::Tensor bitboards_to_tensor(const std::vector<std::vector<std::vector<int>>> &bitboards)
+// {
+//     std::vector<torch::Tensor> channels;
+//     for (const auto &board : bitboards)
+//     {
+//         // auto opts = torch::TensorOptions().dtype(torch::kInt32);
+//         // torch::Tensor t = torch::from_blob(t.data(), {3}, opts).to(torch::kInt64);
+//         torch::Tensor board_tensor = torch::from_blob(const_cast<int *>(board[0].data()), {8, 8}, torch::kInt32).clone();
+//         channels.push_back(board_tensor.unsqueeze(0));
+//     }
+//     std::cout << torch::cat(channels, 0).to(torch::kFloat32) << std::endl;
+//     return torch::cat(channels, 0).to(torch::kFloat32);
+// }
 
-    return torch::cat(channels, 0).to(torch::kFloat32);
+// Function to convert bitboards to a float tensor
+torch::Tensor bitboards_to_tensor(const std::vector<std::vector<std::vector<int>>> &bitboards) {
+    // Determine the number of bitboards
+    int n = bitboards.size();
+    
+    // Initialize an empty tensor with shape (n, 8, 8) and float type
+    torch::Tensor tensor = torch::empty({n, 8, 8}, torch::kFloat32);
+    
+    // Create a 3D accessor for efficient indexing
+    auto accessor = tensor.accessor<float, 3>();
+    
+    // Iterate over the bitboards and assign values to the tensor
+    for(int i = 0; i < n; ++i){
+        for(int j = 0; j < 8; ++j){
+            for(int k = 0; k < 8; ++k){
+                accessor[i][j][k] = static_cast<float>(bitboards[i][j][k]);
+            }
+        }
+    }
+    
+    // std::cout << tensor << std::endl;
+    
+    return tensor;
 }
 
 void ChessNet::initialize_weights()
@@ -114,13 +138,11 @@ void ChessNet::initialize_weights()
         }
         else if (auto *bn1d = dynamic_cast<torch::nn::BatchNorm1dImpl *>(module.get()))
         {
-            // Initialize BatchNorm1d weights and biases
             torch::nn::init::ones_(bn1d->weight);
             torch::nn::init::zeros_(bn1d->bias);
         }
         else if (auto *bn2d = dynamic_cast<torch::nn::BatchNorm2dImpl *>(module.get()))
         {
-            // Initialize BatchNorm2d weights and biases
             torch::nn::init::ones_(bn2d->weight);
             torch::nn::init::zeros_(bn2d->bias);
         }
