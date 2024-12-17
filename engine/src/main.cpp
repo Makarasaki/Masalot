@@ -10,7 +10,7 @@
 #include "../include/evaluate.h"
 // #include "../include/chessnet.h"
 
-const int PORT = 12345;
+const int PORT = 12346;
 const int BUFFER_SIZE = 1024;
 
 void handle_connection(int client_socket) {
@@ -22,6 +22,7 @@ void handle_connection(int client_socket) {
     try {
         input_archive.load_from("../../training/NN_weights/model_last.pt");
         model.load(input_archive);  // Load the weights into the model
+        model.eval();
         // Check if CUDA is available
         if (torch::cuda::is_available()) {
             model.to(torch::kCUDA);

@@ -584,7 +584,6 @@ namespace Movelist {
                     return -1;
                 }
                 return value;
-                std::cout << "Tu nie powinno wpa��" << std::endl;
             }
             else {
                 float value = std::numeric_limits<float>::max();
@@ -606,7 +605,6 @@ namespace Movelist {
                     return 1;
                 }
                 return value;
-                std::cout << "Tu nie powinno wpa��" << std::endl;
             }
             //SORT EVALUATION ASCENDING OR DESCENDING, DEPENDS ON STATUS AND RETURN ONE
             //Implement vector of evaluations from bitloop
@@ -1099,18 +1097,9 @@ namespace Movelist {
             return -1;
         }
 
+        std::cerr << "Tu nie powinno wpaść 1 " << std::endl;
+        std::cout << "depth: "<< depth << " value: " << value << " alpha: " << alpha << " beta: " << beta << std::endl;
         return value;
-
-        if constexpr (justcount)
-        {
-            std::cout << "JUSTCOUNT" << std::endl;
-            return movecnt;
-        }
-        else
-        {
-            std::cout << "Nie powinno tu wpasc 78567563" << std::endl;
-            return value;
-        }
     }
 
 
@@ -1685,18 +1674,9 @@ namespace Movelist {
             return 1;
         }
 
+        std::cerr << "Tu nie powinno wpaść 2 " << std::endl;
+        std::cout << "depth: "<< depth << " value: " << value << " alpha: " << alpha << " beta: " << beta << std::endl;
         return value;
-
-        if constexpr (justcount)
-        {
-            std::cout << "JUSTCOUNT" << std::endl;
-            return movecnt;
-        }
-        else
-        {   
-            std::cout << "Nie powinno tu wpasc" << std::endl;
-            return value;
-        }
     }
 
 

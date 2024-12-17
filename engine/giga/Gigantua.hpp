@@ -2,6 +2,7 @@
 #include <chrono>
 #include <random>
 #include <cstring>
+#include <string>
 #include <vector>
 
 #include <cstdlib> // For rand()
@@ -30,11 +31,38 @@ public:
 		Movelist::Init(EPInit);
 	}
 
+	std::uint64_t combineHash(Board &brd, int EnPassantTarget)
+	{
+		std::uint64_t h = 0xcbf29ce484222325ULL;
+		auto hashCombine = [&](std::uint64_t val)
+		{
+			// Fowler–Noll–Vo hash function (FNV-1a)
+			h ^= val;
+			h *= 1099511628211ULL;
+		};
+
+		hashCombine(brd.WPawn);
+		hashCombine(brd.WKnight);
+		hashCombine(brd.WBishop);
+		hashCombine(brd.WRook);
+		hashCombine(brd.WQueen);
+		hashCombine(brd.WKing);
+		hashCombine(brd.BPawn);
+		hashCombine(brd.BKnight);
+		hashCombine(brd.BBishop);
+		hashCombine(brd.BRook);
+		hashCombine(brd.BQueen);
+		hashCombine(brd.BKing);
+		hashCombine(EnPassantTarget);
+
+		return h;
+	}
+
 	template<class BoardStatus status>
 	static _ForceInline ChessData positionToBitboards(Board& brd) {
 	uint64_t allOnes = ~0ULL;
     ChessData bitboards;
-    bitboards.bitboards.resize(18);
+    bitboards.bitboards.resize(13);
 
     bitboards.bitboards[0] = intToBitboardWhites(brd.WPawn);
     bitboards.bitboards[1] = intToBitboardWhites(brd.WKnight);
@@ -49,37 +77,38 @@ public:
     bitboards.bitboards[9] = intToBitboardBlacks(brd.BRook);
     bitboards.bitboards[10] = intToBitboardBlacks(brd.BQueen);
     bitboards.bitboards[11] = intToBitboardBlacks(brd.BKing);
+	
     bitboards.bitboards[12] = intToBitboard(Movelist::EnPassantTarget);
 
-	if (status.WhiteMove){
-		bitboards.bitboards[13] = intToBitboard(allOnes);
-	}else{
-		bitboards.bitboards[13] = intToBitboard(0);
-	}
+	// if (status.WhiteMove){
+	// 	bitboards.bitboards[13] = intToBitboard(allOnes);
+	// }else{
+	// 	bitboards.bitboards[13] = intToBitboard(0);
+	// }
 
-	if (status.WCastleL){
-		bitboards.bitboards[14] = intToBitboard(allOnes);
-	}else{
-		bitboards.bitboards[14] = intToBitboard(0);
-	}
+	// if (status.WCastleL){
+	// 	bitboards.bitboards[14] = intToBitboard(allOnes);
+	// }else{
+	// 	bitboards.bitboards[14] = intToBitboard(0);
+	// }
 
-	if (status.WCastleR){
-		bitboards.bitboards[15] = intToBitboard(allOnes);
-	}else{
-		bitboards.bitboards[15] = intToBitboard(0);
-	}
+	// if (status.WCastleR){
+	// 	bitboards.bitboards[15] = intToBitboard(allOnes);
+	// }else{
+	// 	bitboards.bitboards[15] = intToBitboard(0);
+	// }
 
-	if (status.BCastleL){
-		bitboards.bitboards[16] = intToBitboard(allOnes);
-	}else{
-		bitboards.bitboards[16] = intToBitboard(0);
-	}
+	// if (status.BCastleL){
+	// 	bitboards.bitboards[16] = intToBitboard(allOnes);
+	// }else{
+	// 	bitboards.bitboards[16] = intToBitboard(0);
+	// }
 
-	if (status.BCastleR){
-		bitboards.bitboards[17] = intToBitboard(allOnes);
-	}else{
-		bitboards.bitboards[17] = intToBitboard(0);
-	}
+	// if (status.BCastleR){
+	// 	bitboards.bitboards[17] = intToBitboard(allOnes);
+	// }else{
+	// 	bitboards.bitboards[17] = intToBitboard(0);
+	// }
 
     return bitboards;
 }
@@ -115,6 +144,7 @@ public:
 
 
 		// Convert the FEN position to bitboards and then to a tensor
+		// std::cout << "white? " << status.WhiteMove << std::endl;
 		ChessData positionInBitboards = positionToBitboards<status>(brd);
 		torch::Tensor positionINTensor = bitboardsToTensor(positionInBitboards.bitboards);
 		// Reshape input tensor to [1, 14, 8, 8] for batch processing
@@ -138,8 +168,8 @@ public:
 		//std::cout << "Status PERFT0" << std::endl;
 		nodes++;
 		//return 0;
-		// float eval = evaluate<status>(brd);
-		float eval = static_cast<float>(rand()) / (static_cast<float>(RAND_MAX) / 2.0f) - 1.0f;//std::cout << "eval: " << eval << std::endl;
+		float eval = evaluate<status>(brd);
+		// float eval = static_cast<float>(rand()) / (static_cast<float>(RAND_MAX) / 2.0f) - 1.0f;//std::cout << "eval: " << eval << std::endl;
 		return eval;
 	}
 	

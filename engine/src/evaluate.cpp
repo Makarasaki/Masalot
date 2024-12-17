@@ -141,7 +141,7 @@ std::string search_best_move(ChessNet &model, std::string pos, int depth)
     float best_eval;
     if (isWhite_var)
     {
-        best_eval = std::numeric_limits<float>::min();
+        best_eval = std::numeric_limits<float>::lowest();
     }
     else
     {
@@ -156,11 +156,11 @@ std::string search_best_move(ChessNet &model, std::string pos, int depth)
     for (const auto &new_pos : positions)
     {
         // float eval = alpha_beta(model, new_pos, depth - 1, std::numeric_limits<float>::min(), std::numeric_limits<float>::max(), !isWhite_var);
-        std::cout << "Evaluating position: " << new_pos << std::endl;
-        float eval = _PerfT(new_pos, depth - 1, std::numeric_limits<float>::min(), std::numeric_limits<float>::max(), model);
+        std::cout << "Evaluating positionn: " << new_pos << std::endl;
+        float eval = _PerfT(new_pos, depth - 1, std::numeric_limits<float>::lowest(), std::numeric_limits<float>::max(), model);
+        std::cout << "eval: " << eval << std::endl;
         if (isWhite_var)
         {
-
             // best_eval = std::max(best_eval, eval);
             if (eval > best_eval)
             {
@@ -170,7 +170,6 @@ std::string search_best_move(ChessNet &model, std::string pos, int depth)
         }
         else
         {   
-            // best_eval = std::min(best_eval, eval);
             if (eval < best_eval)
             {
                 best_eval = eval;
@@ -179,6 +178,7 @@ std::string search_best_move(ChessNet &model, std::string pos, int depth)
         }
     }
     std::cout << "najlepszy" << best_move << std::endl;
+    std::cout << "eval: " << best_eval << std::endl;
     return best_move;
 }
 

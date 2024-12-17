@@ -1,6 +1,9 @@
 ALTER TABLE evaluations ADD COLUMN eval_scaled FLOAT;
 
 UPDATE evaluations
+SET eval_scaled = CAST(eval AS INTEGER);
+
+UPDATE evaluations
 SET eval_scaled = 250
 WHERE eval LIKE '#+%';
 

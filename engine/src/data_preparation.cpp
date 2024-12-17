@@ -123,15 +123,39 @@ uint64_t extractInfoFromFEN(const std::string& FEN) {
     return info;  // The first 5 bits will have the information, rest will be zeros
 }
 
-torch::Tensor bitboardsToTensor(const std::vector<std::vector<std::vector<int>>>& bitboards) {
-    std::vector<torch::Tensor> channels;
+// torch::Tensor bitboardsToTensor(const std::vector<std::vector<std::vector<int>>>& bitboards) {
+//     std::vector<torch::Tensor> channels;
 
-    for (const auto& board : bitboards) {
-        torch::Tensor board_tensor = torch::from_blob(const_cast<int*>(board[0].data()), {8, 8}, torch::kInt32).clone();
-        channels.push_back(board_tensor.unsqueeze(0));
+//     for (const auto& board : bitboards) {
+//         torch::Tensor board_tensor = torch::from_blob(const_cast<int*>(board[0].data()), {8, 8}, torch::kInt32).clone();
+//         channels.push_back(board_tensor.unsqueeze(0));
+//     }
+
+//     return torch::cat(channels, 0).to(torch::kFloat32);
+// }
+
+torch::Tensor bitboardsToTensor(const std::vector<std::vector<std::vector<int>>> &bitboards) {
+    // Determine the number of bitboards
+    int n = bitboards.size();
+    
+    // Initialize an empty tensor with shape (n, 8, 8) and float type
+    torch::Tensor tensor = torch::empty({n, 8, 8}, torch::kFloat32);
+    
+    // Create a 3D accessor for efficient indexing
+    auto accessor = tensor.accessor<float, 3>();
+    
+    // Iterate over the bitboards and assign values to the tensor
+    for(int i = 0; i < n; ++i){
+        for(int j = 0; j < 8; ++j){
+            for(int k = 0; k < 8; ++k){
+                accessor[i][j][k] = static_cast<float>(bitboards[i][j][k]);
+            }
+        }
     }
-
-    return torch::cat(channels, 0).to(torch::kFloat32);
+    
+    // std::cout << tensor << std::endl;
+    
+    return tensor;
 }
 
 std::vector<std::vector<int>> intToBitboard(uint64_t bitboard) {

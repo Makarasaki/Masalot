@@ -13,4 +13,9 @@ data_preparation/bin/*
 data/*
 !data/.gitkeep
 
+data_preparation/.vscode/
+log.txt
+training/.vs/
+training/out/
+
 .vscode/*
