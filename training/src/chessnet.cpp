@@ -76,6 +76,7 @@ torch::Tensor ChessNet::forward(torch::Tensor x)
         std::cout << "output avg: " << x.mean().item().toFloat() << std::endl;
         std::cout << "output range: " << x.min().item().toFloat() << " to " << x.max().item().toFloat() << std::endl;
     }
+
     return x;
 }
 
