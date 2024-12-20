@@ -735,16 +735,23 @@ namespace Movelist
                     float eval = Callback_Move::template Kingmove<status, depth>(brd, King<status.WhiteMove>(brd), 1ull << sq, alpha, beta);
                     value = std::max(value, eval);
                     alpha = std::max(alpha, value);
-                    if (alpha >= beta)
+                    if (alpha >= beta and depth > 1)
                     {
                         // Beta cutoff
                         return value;
                     }
                 }
+
                 if (value < -1)
                 {
                     // std::cout << "Checkmate detected for black bitloop" << std::endl;
                     return -1;
+                }
+
+                if (depth == 1)
+                {
+                    value = Callback_Move::template runBatch<status>();
+                    return value;
                 }
                 return value;
             }
@@ -758,16 +765,23 @@ namespace Movelist
                     float eval = Callback_Move::template Kingmove<status, depth>(brd, King<status.WhiteMove>(brd), 1ull << sq, alpha, beta);
                     value = std::min(value, eval);
                     beta = std::min(beta, value);
-                    if (beta <= alpha)
+                    if (beta <= alpha and depth > 1)
                     {
                         // Alpha cutoff
                         return value;
                     }
                 }
+
                 if (value > 1)
                 {
                     // std::cout << "Checkmate detected for white bitloop" << std::endl;
                     return 1;
+                }
+
+                if (depth == 1)
+                {
+                    value = Callback_Move::template runBatch<status>();
+                    return value;
                 }
                 return value;
             }
@@ -819,7 +833,7 @@ namespace Movelist
                 eval = Callback_Move::template Kingmove<status, depth>(brd, King<white>(brd), 1ull << sq, alpha, beta);
                 value = std::max(value, eval);
                 alpha = std::max(alpha, value);
-                if (alpha >= beta)
+                if (alpha >= beta and depth > 1 and depth > 1)
                 {
                     // Beta cutoff
                     return value;
@@ -837,7 +851,7 @@ namespace Movelist
                     eval = Callback_Move::template KingCastle<status, depth>(brd, (King<white>(brd) | King<white>(brd) << 2), status.Castle_RookswitchL(), alpha, beta);
                     value = std::max(value, eval);
                     alpha = std::max(alpha, value);
-                    if (alpha >= beta)
+                    if (alpha >= beta and depth > 1)
                     {
                         // Beta cutoff
                         return value;
@@ -852,7 +866,7 @@ namespace Movelist
                     eval = Callback_Move::template KingCastle<status, depth>(brd, (King<white>(brd) | King<white>(brd) >> 2), status.Castle_RookswitchR(), alpha, beta);
                     value = std::max(value, eval);
                     alpha = std::max(alpha, value);
-                    if (alpha >= beta)
+                    if (alpha >= beta and depth > 1)
                     {
                         // Beta cutoff
                         return value;
@@ -906,7 +920,7 @@ namespace Movelist
                         eval = Callback_Move::template PawnEnpassantTake<status, depth>(brd, EPLpawn, EPLpawn << 1, Pawn_AttackLeft<white>(EPLpawn), alpha, beta);
                         value = std::max(value, eval);
                         alpha = std::max(alpha, value);
-                        if (alpha >= beta)
+                        if (alpha >= beta and depth > 1)
                         {
                             // Beta cutoff
                             return value;
@@ -917,7 +931,7 @@ namespace Movelist
                         eval = Callback_Move::template PawnEnpassantTake<status, depth>(brd, EPRpawn, EPRpawn >> 1, Pawn_AttackRight<white>(EPRpawn), alpha, beta);
                         value = std::max(value, eval);
                         alpha = std::max(alpha, value);
-                        if (alpha >= beta)
+                        if (alpha >= beta and depth > 1)
                         {
                             // Beta cutoff
                             return value;
@@ -943,7 +957,7 @@ namespace Movelist
                     eval = Callback_Move::template Pawnpromote<status, depth>(brd, pos, Pawn_AttackLeft<white>(pos), alpha, beta);
                     value = std::max(value, eval);
                     alpha = std::max(alpha, value);
-                    if (alpha >= beta)
+                    if (alpha >= beta and depth > 1)
                     {
                         // Beta cutoff
                         return value;
@@ -955,7 +969,7 @@ namespace Movelist
                     eval = Callback_Move::template Pawnpromote<status, depth>(brd, pos, Pawn_AttackRight<white>(pos), alpha, beta);
                     value = std::max(value, eval);
                     alpha = std::max(alpha, value);
-                    if (alpha >= beta)
+                    if (alpha >= beta and depth > 1)
                     {
                         // Beta cutoff
                         return value;
@@ -967,7 +981,7 @@ namespace Movelist
                     eval = Callback_Move::template Pawnpromote<status, depth>(brd, pos, Pawn_Forward<white>(pos), alpha, beta);
                     value = std::max(value, eval);
                     alpha = std::max(alpha, value);
-                    if (alpha >= beta)
+                    if (alpha >= beta and depth > 1)
                     {
                         // Beta cutoff
                         return value;
@@ -979,7 +993,7 @@ namespace Movelist
                     eval = Callback_Move::template Pawnatk<status, depth>(brd, pos, Pawn_AttackLeft<white>(pos), alpha, beta);
                     value = std::max(value, eval);
                     alpha = std::max(alpha, value);
-                    if (alpha >= beta)
+                    if (alpha >= beta and depth > 1)
                     {
                         // Beta cutoff
                         return value;
@@ -991,7 +1005,7 @@ namespace Movelist
                     eval = Callback_Move::template Pawnatk<status, depth>(brd, pos, Pawn_AttackRight<white>(pos), alpha, beta);
                     value = std::max(value, eval);
                     alpha = std::max(alpha, value);
-                    if (alpha >= beta)
+                    if (alpha >= beta and depth > 1)
                     {
                         // Beta cutoff
                         return value;
@@ -1003,7 +1017,7 @@ namespace Movelist
                     eval = Callback_Move::template Pawnmove<status, depth>(brd, pos, Pawn_Forward<white>(pos), alpha, beta);
                     value = std::max(value, eval);
                     alpha = std::max(alpha, value);
-                    if (alpha >= beta)
+                    if (alpha >= beta and depth > 1)
                     {
                         // Beta cutoff
                         return value;
@@ -1015,7 +1029,7 @@ namespace Movelist
                     eval = Callback_Move::template Pawnpush<status, depth>(brd, pos, Pawn_Forward2<white>(pos), alpha, beta);
                     value = std::max(value, eval);
                     alpha = std::max(alpha, value);
-                    if (alpha >= beta)
+                    if (alpha >= beta and depth > 1)
                     {
                         // Beta cutoff
                         return value;
@@ -1030,7 +1044,7 @@ namespace Movelist
                     eval = Callback_Move::template Pawnatk<status, depth>(brd, pos, Pawn_AttackLeft<white>(pos), alpha, beta);
                     value = std::max(value, eval);
                     alpha = std::max(alpha, value);
-                    if (alpha >= beta)
+                    if (alpha >= beta and depth > 1)
                     {
                         // Beta cutoff
                         return value;
@@ -1042,7 +1056,7 @@ namespace Movelist
                     eval = Callback_Move::template Pawnatk<status, depth>(brd, pos, Pawn_AttackRight<white>(pos), alpha, beta);
                     value = std::max(value, eval);
                     alpha = std::max(alpha, value);
-                    if (alpha >= beta)
+                    if (alpha >= beta and depth > 1)
                     {
                         // Beta cutoff
                         return value;
@@ -1054,7 +1068,7 @@ namespace Movelist
                     eval = Callback_Move::template Pawnmove<status, depth>(brd, pos, Pawn_Forward<white>(pos), alpha, beta);
                     value = std::max(value, eval);
                     alpha = std::max(alpha, value);
-                    if (alpha >= beta)
+                    if (alpha >= beta and depth > 1)
                     {
                         // Beta cutoff
                         return value;
@@ -1066,7 +1080,7 @@ namespace Movelist
                     eval = Callback_Move::template Pawnpush<status, depth>(brd, pos, Pawn_Forward2<white>(pos), alpha, beta);
                     value = std::max(value, eval);
                     alpha = std::max(alpha, value);
-                    if (alpha >= beta)
+                    if (alpha >= beta and depth > 1)
                     {
                         // Beta cutoff
                         return value;
@@ -1089,7 +1103,7 @@ namespace Movelist
                     eval = Callback_Move::template Knightmove<status, depth>(brd, 1ull << sq, to, alpha, beta);
                     value = std::max(value, eval);
                     alpha = std::max(alpha, value);
-                    if (alpha >= beta)
+                    if (alpha >= beta and depth > 1)
                     {
                         // Beta cutoff
                         return value;
@@ -1122,7 +1136,7 @@ namespace Movelist
                         eval = Callback_Move::template Queenmove<status, depth>(brd, pos, to, alpha, beta);
                         value = std::max(value, eval);
                         alpha = std::max(alpha, value);
-                        if (alpha >= beta)
+                        if (alpha >= beta and depth > 1)
                         {
                             // Beta cutoff
                             return value;
@@ -1137,7 +1151,7 @@ namespace Movelist
                         eval = Callback_Move::template Bishopmove<status, depth>(brd, pos, to, alpha, beta);
                         value = std::max(value, eval);
                         alpha = std::max(alpha, value);
-                        if (alpha >= beta)
+                        if (alpha >= beta and depth > 1)
                         {
                             // Beta cutoff
                             return value;
@@ -1156,7 +1170,7 @@ namespace Movelist
                     eval = Callback_Move::template Bishopmove<status, depth>(brd, 1ull << sq, to, alpha, beta);
                     value = std::max(value, eval);
                     alpha = std::max(alpha, value);
-                    if (alpha >= beta)
+                    if (alpha >= beta and depth > 1)
                     {
                         // Beta cutoff
                         return value;
@@ -1185,7 +1199,7 @@ namespace Movelist
                         eval = Callback_Move::template Queenmove<status, depth>(brd, pos, to, alpha, beta);
                         value = std::max(value, eval);
                         alpha = std::max(alpha, value);
-                        if (alpha >= beta)
+                        if (alpha >= beta and depth > 1)
                         {
                             // Beta cutoff
                             return value;
@@ -1200,7 +1214,7 @@ namespace Movelist
                         eval = Callback_Move::template Rookmove<status, depth>(brd, pos, to, alpha, beta);
                         value = std::max(value, eval);
                         alpha = std::max(alpha, value);
-                        if (alpha >= beta)
+                        if (alpha >= beta and depth > 1)
                         {
                             // Beta cutoff
                             return value;
@@ -1219,7 +1233,7 @@ namespace Movelist
                     eval = Callback_Move::template Rookmove<status, depth>(brd, 1ull << sq, to, alpha, beta);
                     value = std::max(value, eval);
                     alpha = std::max(alpha, value);
-                    if (alpha >= beta)
+                    if (alpha >= beta and depth > 1)
                     {
                         // Beta cutoff
                         return value;
@@ -1243,7 +1257,7 @@ namespace Movelist
                     eval = Callback_Move::template Queenmove<status, depth>(brd, 1ull << sq, to, alpha, beta);
                     value = std::max(value, eval);
                     alpha = std::max(alpha, value);
-                    if (alpha >= beta)
+                    if (alpha >= beta and depth > 1)
                     {
                         // Beta cutoff
                         return value;
@@ -1252,8 +1266,6 @@ namespace Movelist
             }
         }
 
-        // SORT VECTOR WITH EVAUATIONS ASCENDING OR DESCENDING, DEPENDS ON WHOSE TURN IS IT AND RETURN BEST/WORSE EVALUATION.
-        // IF NO EVALUATIONS GENERATED, THEN IT IS STALEMATE OR CHECKMATE, AND POSITION NEEDS TO BE EVALUATED HERE
         if (noCheck and value > 1)
         {
             std::cout << "Stalemate detected 8638946392846389" << std::endl;
@@ -1265,6 +1277,11 @@ namespace Movelist
             return -1;
         }
 
+        if (depth == 1)
+        {
+            value = Callback_Move::template runBatch<status>();
+            return value;
+        }
         // std::cerr << "Tu nie powinno wpaść 1 " << std::endl;
         // std::cout << "depth: "<< depth << " value: " << value << " alpha: " << alpha << " beta: " << beta << std::endl;
         return value;
@@ -1300,7 +1317,7 @@ namespace Movelist
                 eval = Callback_Move::template Kingmove<status, depth>(brd, King<white>(brd), 1ull << sq, alpha, beta);
                 value = std::min(value, eval);
                 beta = std::min(beta, value);
-                if (beta <= alpha)
+                if (beta <= alpha and depth > 1)
                 {
                     // Alpha cutoff
                     return value;
@@ -1317,7 +1334,7 @@ namespace Movelist
                     eval = Callback_Move::template KingCastle<status, depth>(brd, (King<white>(brd) | King<white>(brd) << 2), status.Castle_RookswitchL(), alpha, beta);
                     value = std::min(value, eval);
                     beta = std::min(beta, value);
-                    if (beta <= alpha)
+                    if (beta <= alpha and depth > 1)
                     {
                         // Alpha cutoff
                         return value;
@@ -1332,7 +1349,7 @@ namespace Movelist
                     eval = Callback_Move::template KingCastle<status, depth>(brd, (King<white>(brd) | King<white>(brd) >> 2), status.Castle_RookswitchR(), alpha, beta);
                     value = std::min(value, eval);
                     beta = std::min(beta, value);
-                    if (beta <= alpha)
+                    if (beta <= alpha and depth > 1)
                     {
                         // Alpha cutoff
                         return value;
@@ -1386,7 +1403,7 @@ namespace Movelist
                         eval = Callback_Move::template PawnEnpassantTake<status, depth>(brd, EPLpawn, EPLpawn << 1, Pawn_AttackLeft<white>(EPLpawn), alpha, beta);
                         value = std::min(value, eval);
                         beta = std::min(beta, value);
-                        if (beta <= alpha)
+                        if (beta <= alpha and depth > 1)
                         {
                             // Alpha cutoff
                             return value;
@@ -1397,7 +1414,7 @@ namespace Movelist
                         eval = Callback_Move::template PawnEnpassantTake<status, depth>(brd, EPRpawn, EPRpawn >> 1, Pawn_AttackRight<white>(EPRpawn), alpha, beta);
                         value = std::min(value, eval);
                         beta = std::min(beta, value);
-                        if (beta <= alpha)
+                        if (beta <= alpha and depth > 1)
                         {
                             // Alpha cutoff
                             return value;
@@ -1423,7 +1440,7 @@ namespace Movelist
                     eval = Callback_Move::template Pawnpromote<status, depth>(brd, pos, Pawn_AttackLeft<white>(pos), alpha, beta);
                     value = std::min(value, eval);
                     beta = std::min(beta, value);
-                    if (beta <= alpha)
+                    if (beta <= alpha and depth > 1)
                     {
                         // Alpha cutoff
                         return value;
@@ -1435,7 +1452,7 @@ namespace Movelist
                     eval = Callback_Move::template Pawnpromote<status, depth>(brd, pos, Pawn_AttackRight<white>(pos), alpha, beta);
                     value = std::min(value, eval);
                     beta = std::min(beta, value);
-                    if (beta <= alpha)
+                    if (beta <= alpha and depth > 1)
                     {
                         // Alpha cutoff
                         return value;
@@ -1447,7 +1464,7 @@ namespace Movelist
                     eval = Callback_Move::template Pawnpromote<status, depth>(brd, pos, Pawn_Forward<white>(pos), alpha, beta);
                     value = std::min(value, eval);
                     beta = std::min(beta, value);
-                    if (beta <= alpha)
+                    if (beta <= alpha and depth > 1)
                     {
                         // Alpha cutoff
                         return value;
@@ -1459,7 +1476,7 @@ namespace Movelist
                     eval = Callback_Move::template Pawnatk<status, depth>(brd, pos, Pawn_AttackLeft<white>(pos), alpha, beta);
                     value = std::min(value, eval);
                     beta = std::min(beta, value);
-                    if (beta <= alpha)
+                    if (beta <= alpha and depth > 1)
                     {
                         // Alpha cutoff
                         return value;
@@ -1471,7 +1488,7 @@ namespace Movelist
                     eval = Callback_Move::template Pawnatk<status, depth>(brd, pos, Pawn_AttackRight<white>(pos), alpha, beta);
                     value = std::min(value, eval);
                     beta = std::min(beta, value);
-                    if (beta <= alpha)
+                    if (beta <= alpha and depth > 1)
                     {
                         // Alpha cutoff
                         return value;
@@ -1483,7 +1500,7 @@ namespace Movelist
                     eval = Callback_Move::template Pawnmove<status, depth>(brd, pos, Pawn_Forward<white>(pos), alpha, beta);
                     value = std::min(value, eval);
                     beta = std::min(beta, value);
-                    if (beta <= alpha)
+                    if (beta <= alpha and depth > 1)
                     {
                         // Alpha cutoff
                         return value;
@@ -1495,7 +1512,7 @@ namespace Movelist
                     eval = Callback_Move::template Pawnpush<status, depth>(brd, pos, Pawn_Forward2<white>(pos), alpha, beta);
                     value = std::min(value, eval);
                     beta = std::min(beta, value);
-                    if (beta <= alpha)
+                    if (beta <= alpha and depth > 1)
                     {
                         // Alpha cutoff
                         return value;
@@ -1510,7 +1527,7 @@ namespace Movelist
                     eval = Callback_Move::template Pawnatk<status, depth>(brd, pos, Pawn_AttackLeft<white>(pos), alpha, beta);
                     value = std::min(value, eval);
                     beta = std::min(beta, value);
-                    if (beta <= alpha)
+                    if (beta <= alpha and depth > 1)
                     {
                         // Alpha cutoff
                         return value;
@@ -1522,7 +1539,7 @@ namespace Movelist
                     eval = Callback_Move::template Pawnatk<status, depth>(brd, pos, Pawn_AttackRight<white>(pos), alpha, beta);
                     value = std::min(value, eval);
                     beta = std::min(beta, value);
-                    if (beta <= alpha)
+                    if (beta <= alpha and depth > 1)
                     {
                         // Alpha cutoff
                         return value;
@@ -1534,7 +1551,7 @@ namespace Movelist
                     eval = Callback_Move::template Pawnmove<status, depth>(brd, pos, Pawn_Forward<white>(pos), alpha, beta);
                     value = std::min(value, eval);
                     beta = std::min(beta, value);
-                    if (beta <= alpha)
+                    if (beta <= alpha and depth > 1)
                     {
                         // Alpha cutoff
                         return value;
@@ -1546,7 +1563,7 @@ namespace Movelist
                     eval = Callback_Move::template Pawnpush<status, depth>(brd, pos, Pawn_Forward2<white>(pos), alpha, beta);
                     value = std::min(value, eval);
                     beta = std::min(beta, value);
-                    if (beta <= alpha)
+                    if (beta <= alpha and depth > 1)
                     {
                         // Alpha cutoff
                         return value;
@@ -1569,7 +1586,7 @@ namespace Movelist
                     eval = Callback_Move::template Knightmove<status, depth>(brd, 1ull << sq, to, alpha, beta);
                     value = std::min(value, eval);
                     beta = std::min(beta, value);
-                    if (beta <= alpha)
+                    if (beta <= alpha and depth > 1)
                     {
                         // Alpha cutoff
                         return value;
@@ -1602,7 +1619,7 @@ namespace Movelist
                         eval = Callback_Move::template Queenmove<status, depth>(brd, pos, to, alpha, beta);
                         value = std::min(value, eval);
                         beta = std::min(beta, value);
-                        if (beta <= alpha)
+                        if (beta <= alpha and depth > 1)
                         {
                             // Alpha cutoff
                             return value;
@@ -1617,7 +1634,7 @@ namespace Movelist
                         eval = Callback_Move::template Bishopmove<status, depth>(brd, pos, to, alpha, beta);
                         value = std::min(value, eval);
                         beta = std::min(beta, value);
-                        if (beta <= alpha)
+                        if (beta <= alpha and depth > 1)
                         {
                             // Alpha cutoff
                             return value;
@@ -1636,7 +1653,7 @@ namespace Movelist
                     eval = Callback_Move::template Bishopmove<status, depth>(brd, 1ull << sq, to, alpha, beta);
                     value = std::min(value, eval);
                     beta = std::min(beta, value);
-                    if (beta <= alpha)
+                    if (beta <= alpha and depth > 1)
                     {
                         // Alpha cutoff
                         return value;
@@ -1665,7 +1682,7 @@ namespace Movelist
                         eval = Callback_Move::template Queenmove<status, depth>(brd, pos, to, alpha, beta);
                         value = std::min(value, eval);
                         beta = std::min(beta, value);
-                        if (beta <= alpha)
+                        if (beta <= alpha and depth > 1)
                         {
                             // Alpha cutoff
                             return value;
@@ -1680,7 +1697,7 @@ namespace Movelist
                         eval = Callback_Move::template Rookmove<status, depth>(brd, pos, to, alpha, beta);
                         value = std::min(value, eval);
                         beta = std::min(beta, value);
-                        if (beta <= alpha)
+                        if (beta <= alpha and depth > 1)
                         {
                             // Alpha cutoff
                             return value;
@@ -1699,7 +1716,7 @@ namespace Movelist
                     eval = Callback_Move::template Rookmove<status, depth>(brd, 1ull << sq, to, alpha, beta);
                     value = std::min(value, eval);
                     beta = std::min(beta, value);
-                    if (beta <= alpha)
+                    if (beta <= alpha and depth > 1)
                     {
                         // Alpha cutoff
                         return value;
@@ -1723,7 +1740,7 @@ namespace Movelist
                     eval = Callback_Move::template Queenmove<status, depth>(brd, 1ull << sq, to, alpha, beta);
                     value = std::min(value, eval);
                     beta = std::min(beta, value);
-                    if (beta <= alpha)
+                    if (beta <= alpha and depth > 1)
                     {
                         // Alpha cutoff
                         return value;
@@ -1732,7 +1749,6 @@ namespace Movelist
             }
         }
 
-        // IF VALUE == INF, THEN EVALUATE POSITION HERE (STALEMATE OR CHECKMATE)
         if (noCheck and value > 1)
         {
             std::cout << "Stalemate Detected 070892" << std::endl;
@@ -1742,6 +1758,12 @@ namespace Movelist
         {
             // std::cout << "Checkmate detected for white" << std::endl;
             return 1;
+        }
+
+        if (depth == 1)
+        {
+            value = Callback_Move::template runBatch<status>();
+            return value;
         }
 
         // std::cerr << "Tu nie powinno wpaść 2 " << std::endl;
