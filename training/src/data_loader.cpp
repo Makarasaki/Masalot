@@ -1,4 +1,5 @@
 #include "../include/data_loader.h"
+#include "../include/chessnet.h"
 #include <iostream>
 
 // Function to convert a 64-bit integer into an 8x8 bitboard (2D vector)
@@ -38,6 +39,36 @@ std::vector<std::vector<int>> intToBitboardBlacks(uint64_t bitboard) {
     return board;
 }
 
+// White bitboard -> +1 for each set bit
+std::vector<int> intToVector64White(uint64_t bitboard) {
+    std::vector<int> vec(64, 0);
+    for (int i = 0; i < 64; i++) {
+        // Check if bit i is set, then store +1 in that position
+        vec[i] = ((bitboard >> i) & 1ULL) ? 1 : 0;
+    }
+    return vec;
+}
+
+// Black bitboard -> -1 for each set bit
+std::vector<int> intToVector64Black(uint64_t bitboard) {
+    std::vector<int> vec(64, 0);
+    for (int i = 0; i < 64; i++) {
+        // Check if bit i is set, then store -1 in that position
+        vec[i] = ((bitboard >> i) & 1ULL) ? -1 : 0;
+    }
+    return vec;
+}
+
+// Neutral (e.g., en-passant) -> +1 for each set bit
+std::vector<int> intToVector64(uint64_t bitboard) {
+    std::vector<int> vec(64, 0);
+    for (int i = 0; i < 64; i++) {
+        // Check if bit i is set, then store +1 in that position
+        vec[i] = ((bitboard >> i) & 1ULL) ? 1 : 0;
+    }
+    return vec;
+}
+
 std::vector<std::vector<std::vector<int>>> info_to_bitboards(int info) {
     // Create a vector to hold the 8x8 bitboards for each bit
     std::vector<std::vector<std::vector<int>>> bitboards;
@@ -55,114 +86,183 @@ std::vector<std::vector<std::vector<int>>> info_to_bitboards(int info) {
 }
 
 
-std::vector<ChessData> load_data(sqlite3* db, int batch_size, int batch) {
-    std::vector<ChessData> data_batch;
+BatchData load_data(sqlite3* db, int batch_size, int batch, ChessNet net, torch::Device device) {
+    BatchData batch_data;  // Will hold final (inputs, targets) Tensors
+    std::vector<torch::Tensor> inputs;
+    std::vector<torch::Tensor> targets;
+
     sqlite3_stmt* stmt;
 
-    // Calculate the starting offset based on the epoch and batch size
-    int offset = batch * batch_size;  // Start at the next chunk of data for each epoch
+    // Calculate offset for pagination
+    int offset = batch * batch_size;
 
-    // SQL query to select 14 bitboards and the evaluation with LIMIT and OFFSET
-    // const char* sql = "SELECT w_P_bitboard, w_N_bitboard, w_B_bitboard, w_R_bitboard, w_Q_bitboard, w_K_bitboard, "
-    //                   "b_p_bitboard, b_n_bitboard, b_b_bitboard, b_r_bitboard, b_q_bitboard, b_k_bitboard, "
-    //                   "en_passant_bitboard, info, eval_scaled FROM evaluations LIMIT ? OFFSET ?";
+    // SQL to retrieve rows
+    const char* sql =
+        "SELECT w_P_bitboard, w_N_bitboard, w_B_bitboard, w_R_bitboard, w_Q_bitboard, w_K_bitboard, "
+        "       b_p_bitboard, b_n_bitboard, b_b_bitboard, b_r_bitboard, b_q_bitboard, b_k_bitboard, "
+        "       en_passant_bitboard, castling_KW, castling_QW, castling_kb, castling_qb, WhitesTurn, "
+        "       eval_scaled, FEN "
+        "FROM evaluations_rand "
+        "WHERE WhitesTurn = 1 "
+        "LIMIT ? OFFSET ?";
 
-    // REMEMBER ABOUT SPACES
-    const char* sql = "SELECT w_P_bitboard, w_N_bitboard, w_B_bitboard, w_R_bitboard, w_Q_bitboard, w_K_bitboard, "
-                  "b_p_bitboard, b_n_bitboard, b_b_bitboard, b_r_bitboard, b_q_bitboard, b_k_bitboard, "
-                  "en_passant_bitboard, castling_KW, castling_QW, castling_kb, castling_qb, WhitesTurn, eval_scaled, FEN "
-                  "FROM evaluations_rand "
-                  "WHERE WhitesTurn = 1 "
-                  "LIMIT ? OFFSET ?";
-
-    // Prepare SQL statement
+    // Prepare statement
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
-        std::cerr << "Failed to prepare SQL statement." << std::endl;
-        return data_batch;
+        std::cerr << "Failed to prepare SQL statement: " << sqlite3_errmsg(db) << std::endl;
+        return batch_data; // Returns empty BatchData
     }
 
-    // Bind batch size and offset parameters
+    // Bind batch size and offset
     sqlite3_bind_int(stmt, 1, batch_size);
     sqlite3_bind_int(stmt, 2, offset);
 
-    // Fetch data row by row
-    while (sqlite3_step(stmt) == SQLITE_ROW) {
-        ChessData entry;
-        uint64_t allOnes = ~0ULL;
-        entry.bitboards.resize(13);  // 14 bitboards for each position
+    int row_count = 0;
 
-        // Convert each bitboard (64-bit integer) into an 8x8 vector
-        // for (int i = 0; i < 13; ++i) {
-        //     uint64_t bitboard = static_cast<uint64_t>(sqlite3_column_int64(stmt, i));
-        //     entry.bitboards[i] = intToBitboard(bitboard);  // Convert to 8x8 bitboard
-        // }
+    // Fetch rows
+    while (sqlite3_step(stmt) == SQLITE_ROW && row_count < batch_size) {
+        // Build ChessPosition from current row
+        ChessPosition chess_position = {
+            // White pieces bitboards
+            static_cast<uint64_t>(sqlite3_column_int64(stmt, 0)),  // WPawn
+            static_cast<uint64_t>(sqlite3_column_int64(stmt, 1)),  // WKnight
+            static_cast<uint64_t>(sqlite3_column_int64(stmt, 2)),  // WBishop
+            static_cast<uint64_t>(sqlite3_column_int64(stmt, 3)),  // WRook
+            static_cast<uint64_t>(sqlite3_column_int64(stmt, 4)),  // WQueen
+            static_cast<uint64_t>(sqlite3_column_int64(stmt, 5)),  // WKing
 
-        // Convert each bitboard (64-bit integer) into an 8x8 vector
-        for (int i = 0; i < 6; ++i) {
-            uint64_t bitboard = static_cast<uint64_t>(sqlite3_column_int64(stmt, i));
-            entry.bitboards[i] = intToBitboardWhites(bitboard);  // Convert to 8x8 bitboard
+            // Black pieces bitboards
+            static_cast<uint64_t>(sqlite3_column_int64(stmt, 6)),  // BPawn
+            static_cast<uint64_t>(sqlite3_column_int64(stmt, 7)),  // BKnight
+            static_cast<uint64_t>(sqlite3_column_int64(stmt, 8)),  // BBishop
+            static_cast<uint64_t>(sqlite3_column_int64(stmt, 9)),  // BRook
+            static_cast<uint64_t>(sqlite3_column_int64(stmt, 10)), // BQueen
+            static_cast<uint64_t>(sqlite3_column_int64(stmt, 11)), // BKing
+
+            // EnPassant
+            static_cast<uint64_t>(sqlite3_column_int64(stmt, 12)), // EnPassant
+
+            // WhiteMove
+            static_cast<bool>(sqlite3_column_int(stmt, 17)),
+
+            // WCastleL, WCastleR
+            static_cast<bool>(sqlite3_column_int(stmt, 13)),
+            static_cast<bool>(sqlite3_column_int(stmt, 14)),
+
+            // BCastleL, BCastleR
+            static_cast<bool>(sqlite3_column_int(stmt, 15)),
+            static_cast<bool>(sqlite3_column_int(stmt, 16))
+        };
+
+        // Load evaluation (column 18)
+        float evaluation = static_cast<float>(sqlite3_column_double(stmt, 18));
+
+        // Convert ChessPosition to a [837]-sized Tensor
+        torch::Tensor input_tensor;
+        try {
+            // Now that 'net' is a shared pointer, call member functions via '->'
+            input_tensor = net->toTensor(chess_position); // shape [837]
+        }
+        catch (const std::exception& e) {
+            std::cerr << "Error converting position to tensor: " << e.what() << std::endl;
+            continue; // Skip invalid row
         }
 
-        for (int i = 6; i < 12; ++i) {
-            uint64_t bitboard = static_cast<uint64_t>(sqlite3_column_int64(stmt, i));
-            entry.bitboards[i] = intToBitboardBlacks(bitboard);  // Convert to 8x8 bitboard
-        }
+        // Add batch dimension: shape => [1, 837]
+        input_tensor = input_tensor.unsqueeze(0);
 
-        entry.bitboards[12] = intToBitboard(static_cast<uint64_t>(sqlite3_column_int64(stmt, 12)));  // En Passant
+        // Move input_tensor to device (CPU or CUDA)
+        input_tensor = input_tensor.to(device);
 
-        // if (sqlite3_column_int64(stmt, 13) == 1 ){
-        //     entry.bitboards[13] = intToBitboard(allOnes);
-        // }else{
-        //     entry.bitboards[13] = intToBitboard(0);
-        // }
+        // Collect all input samples
+        inputs.push_back(input_tensor);
 
-        // if (sqlite3_column_int64(stmt, 14) == 1){
-        //     entry.bitboards[14] = intToBitboard(allOnes);
-        // }else{
-        //     entry.bitboards[14] = intToBitboard(0);
-        // }
+        // Make a 1D target tensor for the evaluation
+        torch::Tensor target_tensor = torch::tensor(evaluation, torch::dtype(torch::kFloat32)).to(device);
+        targets.push_back(target_tensor);
 
-        // if (sqlite3_column_int64(stmt, 15) == 1){
-        //     entry.bitboards[15] = intToBitboard(allOnes);
-        // }else{
-        //     entry.bitboards[15] = intToBitboard(0);
-        // }
-
-        // if (sqlite3_column_int64(stmt, 16) == 1){
-        //     entry.bitboards[16] = intToBitboard(allOnes);
-        // }else{
-        //     entry.bitboards[16] = intToBitboard(0);
-        // }
-
-        // if (sqlite3_column_int64(stmt, 17) == 1){
-        //     entry.bitboards[17] = intToBitboard(allOnes);
-        // }else{
-        //     entry.bitboards[17] = intToBitboard(0);
-        // }
-
-        // int info = sqlite3_column_int(stmt, 13);
-        // std::vector<std::vector<std::vector<int>>> info_bitboards = info_to_bitboards(info);
-
-        // // Append the info bitboards to the entry's bitboards
-        // entry.bitboards.insert(entry.bitboards.end(), info_bitboards.begin(), info_bitboards.end());
-
-        // Get the evaluation value (scaled between -1 and 1)
-        entry.evaluation = static_cast<float>(sqlite3_column_double(stmt, 18));
-        // std::cout << entry.evaluation << std::endl;
-        // Add the entry to the batch
-        data_batch.push_back(entry);
-
-        // const unsigned char* text = sqlite3_column_text(stmt, 19);
-        // if (text != nullptr) {
-        //     std::cout << reinterpret_cast<const char*>(text) << std::endl;
-        // } else {
-        //     std::cout << "NULL" << std::endl;
-        // }
+        row_count++;
     }
 
-    // Finalize SQL statement
+    // Finalize the statement
     sqlite3_finalize(stmt);
 
-    return data_batch;
+    // If no rows were fetched, return empty BatchData
+    if (row_count == 0) {
+        std::cerr << "No data found in database or no valid rows." << std::endl;
+        return batch_data;
+    }
+
+    // Concatenate input Tensors into shape [row_count, 837]
+    batch_data.inputs = torch::cat(inputs, /*dim=*/0);
+
+    // Stack target Tensors into shape [row_count]
+    batch_data.targets = torch::stack(targets, /*dim=*/0).squeeze(-1);
+
+    // Debug: show first row or shapes if needed
+    // std::cout << batch_data.inputs[0] << std::endl;
+
+    return batch_data;
 }
+
+
+
+
+
+// std::vector<ChessData> load_data(sqlite3* db, int batch_size, int batch) {
+//     std::vector<ChessData> data_batch;
+//     sqlite3_stmt* stmt;
+
+//     // Calculate the starting offset based on the epoch and batch size
+//     int offset = batch * batch_size;  // Start at the next chunk of data for each epoch
+
+
+//     // REMEMBER ABOUT SPACES
+//     const char* sql = "SELECT w_P_bitboard, w_N_bitboard, w_B_bitboard, w_R_bitboard, w_Q_bitboard, w_K_bitboard, "
+//                   "b_p_bitboard, b_n_bitboard, b_b_bitboard, b_r_bitboard, b_q_bitboard, b_k_bitboard, "
+//                   "en_passant_bitboard, castling_KW, castling_QW, castling_kb, castling_qb, WhitesTurn, eval_scaled, FEN "
+//                   "FROM evaluations_rand "
+//                   "WHERE WhitesTurn = 1 "
+//                   "LIMIT ? OFFSET ?";
+
+//     // Prepare SQL statement
+//     if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+//         std::cerr << "Failed to prepare SQL statement." << std::endl;
+//         return data_batch;
+//     }
+
+//     // Bind batch size and offset parameters
+//     sqlite3_bind_int(stmt, 1, batch_size);
+//     sqlite3_bind_int(stmt, 2, offset);
+
+//     // Fetch data row by row
+//     while (sqlite3_step(stmt) == SQLITE_ROW) {
+//         ChessData entry;
+//         uint64_t allOnes = ~0ULL;
+//         entry.bitboards.resize(13);  // 14 bitboards for each position
+
+
+//         // Convert each bitboard (64-bit integer) into an 8x8 vector
+//         for (int i = 0; i < 6; ++i) {
+//             uint64_t bitboard = static_cast<uint64_t>(sqlite3_column_int64(stmt, i));
+//             entry.bitboards[i] = intToBitboardWhites(bitboard);  // Convert to 8x8 bitboard
+//         }
+
+//         for (int i = 6; i < 12; ++i) {
+//             uint64_t bitboard = static_cast<uint64_t>(sqlite3_column_int64(stmt, i));
+//             entry.bitboards[i] = intToBitboardBlacks(bitboard);  // Convert to 8x8 bitboard
+//         }
+
+//         entry.bitboards[12] = intToBitboard(static_cast<uint64_t>(sqlite3_column_int64(stmt, 12)));  // En Passant
+
+//         entry.evaluation = static_cast<float>(sqlite3_column_double(stmt, 18));
+//         // std::cout << entry.evaluation << std::endl;
+//         // Add the entry to the batch
+//         data_batch.push_back(entry);
+//     }
+
+//     // Finalize SQL statement
+//     sqlite3_finalize(stmt);
+
+//     return data_batch;
+// }
 
