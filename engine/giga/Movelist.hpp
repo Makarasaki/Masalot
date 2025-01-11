@@ -745,7 +745,7 @@ namespace Movelist
                 if (value < -1)
                 {
                     // std::cout << "Checkmate detected for black bitloop" << std::endl;
-                    return -1;
+                    return -1.1;
                 }
 
                 if (depth == 1)
@@ -775,7 +775,7 @@ namespace Movelist
                 if (value > 1)
                 {
                     // std::cout << "Checkmate detected for white bitloop" << std::endl;
-                    return 1;
+                    return 1.1;
                 }
 
                 if (depth == 1)
@@ -1274,7 +1274,7 @@ namespace Movelist
         if (value < -1)
         {
             // std::cout << "Checkmate detected for black" << std::endl;
-            return -1;
+            return -1.1;
         }
 
         if (depth == 1)
@@ -1757,7 +1757,7 @@ namespace Movelist
         if (value > 1)
         {
             // std::cout << "Checkmate detected for white" << std::endl;
-            return 1;
+            return 1.1;
         }
 
         if (depth == 1)

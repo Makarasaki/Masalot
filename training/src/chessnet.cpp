@@ -315,6 +315,10 @@ torch::Tensor ChessNetLinearImpl::toTensor(const ChessPosition &position)
     }
 
     // shape: [837]
+    if (torch::cuda::is_available())
+    {
+        tensor = tensor.to(torch::kCUDA);
+    }
     return tensor;
 }
 

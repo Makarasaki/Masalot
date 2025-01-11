@@ -7,6 +7,7 @@
 #include <iostream>
 #include <limits>
 #include <future>
+// #include <unordered_map>
 
 bool isWhite(const std::string &fen)
 {
@@ -57,83 +58,83 @@ std::vector<std::string> generate_positions(std::string pos, bool isWhite)
 }
 
 // Alpha-beta pruning algorithm with neural network evaluation
-float alpha_beta(ChessNet &model, const std::string &pos, int depth, float alpha, float beta, bool isWhite)
-{
-    if (depth == 0)
-    {
-        return evaluate(model, pos); // Pass model to evaluate function
-    }
+// float alpha_beta(ChessNet &model, const std::string &pos, int depth, float alpha, float beta, bool isWhite)
+// {
+//     if (depth == 0)
+//     {
+//         return evaluate(model, pos); // Pass model to evaluate function
+//     }
 
-    std::vector<std::string> positions = generate_positions(pos, isWhite);
-    if (positions.empty())
-    {
-        return evaluate(model, pos); // Handle checkmate or stalemate
-    }
+//     std::vector<std::string> positions = generate_positions(pos, isWhite);
+//     if (positions.empty())
+//     {
+//         return evaluate(model, pos); // Handle checkmate or stalemate
+//     }
 
-    if (isWhite)
-    {
-        float max_eval = std::numeric_limits<float>::lowest(); // Use lowest for float
-        for (const std::string &new_pos : positions)
-        {
-            float eval = alpha_beta(model, new_pos, depth - 1, alpha, beta, false);
-            max_eval = std::max(max_eval, eval);
-            alpha = std::max(alpha, eval);
-            // std::cout << "alpha:" << alpha << std::endl;
-            if (beta <= alpha){
-                std::cout << "depth: " << depth << std::endl;
-                std::cout << "Cutoff!" << depth << std::endl;
-                break; // Beta cutoff
-            }
-        }
-        return max_eval;
-    }
-    else
-    {
-        float min_eval = std::numeric_limits<float>::max(); // Use max for float
-        for (const std::string &new_pos : positions)
-        {
-            float eval = alpha_beta(model, new_pos, depth - 1, alpha, beta, true);
-            min_eval = std::min(min_eval, eval);
-            beta = std::min(beta, eval);
-            // std::cout << "beta:" << beta << std::endl;
-            if (beta <= alpha){
-                std::cout << "depth: " << depth << std::endl;
-                std::cout << "Cutoff!" << depth << std::endl;
-                break; // Alpha cutoff
-            }
-        }
-        return min_eval;
-    }
-}
+//     if (isWhite)
+//     {
+//         float max_eval = std::numeric_limits<float>::lowest(); // Use lowest for float
+//         for (const std::string &new_pos : positions)
+//         {
+//             float eval = alpha_beta(model, new_pos, depth - 1, alpha, beta, false);
+//             max_eval = std::max(max_eval, eval);
+//             alpha = std::max(alpha, eval);
+//             // std::cout << "alpha:" << alpha << std::endl;
+//             if (beta <= alpha){
+//                 std::cout << "depth: " << depth << std::endl;
+//                 std::cout << "Cutoff!" << depth << std::endl;
+//                 break; // Beta cutoff
+//             }
+//         }
+//         return max_eval;
+//     }
+//     else
+//     {
+//         float min_eval = std::numeric_limits<float>::max(); // Use max for float
+//         for (const std::string &new_pos : positions)
+//         {
+//             float eval = alpha_beta(model, new_pos, depth - 1, alpha, beta, true);
+//             min_eval = std::min(min_eval, eval);
+//             beta = std::min(beta, eval);
+//             // std::cout << "beta:" << beta << std::endl;
+//             if (beta <= alpha){
+//                 std::cout << "depth: " << depth << std::endl;
+//                 std::cout << "Cutoff!" << depth << std::endl;
+//                 break; // Alpha cutoff
+//             }
+//         }
+//         return min_eval;
+//     }
+// }
 
 // Evaluate the given chess position (stub implementation).
-float evaluate(ChessNet &model, const std::string &pos)
-{
-    // Convert the FEN position to bitboards and then to a tensor
-    ChessData positionInBitboards = fenToBitboards(pos);
-    torch::Tensor positionINTensor = bitboardsToTensor(positionInBitboards.bitboards);
-    // Reshape input tensor to [1, 14, 8, 8] for batch processing
-    positionINTensor = positionINTensor.unsqueeze(0);
+// float evaluate(ChessNet &model, const std::string &pos)
+// {
+//     // Convert the FEN position to bitboards and then to a tensor
+//     ChessData positionInBitboards = fenToBitboards(pos);
+//     torch::Tensor positionINTensor = bitboardsToTensor(positionInBitboards.bitboards);
+//     // Reshape input tensor to [1, 14, 8, 8] for batch processing
+//     positionINTensor = positionINTensor.unsqueeze(0);
 
-    // Check if CUDA is available
-    if (torch::cuda::is_available()) {
-        positionINTensor = positionINTensor.to(torch::kCUDA);
-    }
-    // Forward pass
-    torch::Tensor output = model.forward(positionINTensor);
+//     // Check if CUDA is available
+//     if (torch::cuda::is_available()) {
+//         positionINTensor = positionINTensor.to(torch::kCUDA);
+//     }
+//     // Forward pass
+//     torch::Tensor output = model.forward(positionINTensor);
 
-    // Retrieve output as a float
-    float eval = output.item<float>();
+//     // Retrieve output as a float
+//     float eval = output.item<float>();
 
-    // Print the evaluation and return
-    std::cout << pos << " eval zł: " << eval << std::endl;
-    return eval;
-}
+//     // Print the evaluation and return
+//     std::cout << pos << " eval zł: " << eval << std::endl;
+//     return eval;
+// }
 
 
 // 2808.73 seconds.
 // Search function to find the best move.
-std::string search_best_move(ChessNet &model, std::string pos, int depth)
+std::string search_best_move(ChessNet model, std::string pos, int depth, std::unordered_map<uint64_t, float> &evaluations_map)
 {
 
     // change
@@ -157,11 +158,12 @@ std::string search_best_move(ChessNet &model, std::string pos, int depth)
     {
         // float eval = alpha_beta(model, new_pos, depth - 1, std::numeric_limits<float>::min(), std::numeric_limits<float>::max(), !isWhite_var);
         std::cout << "Evaluating positionn: " << new_pos << std::endl;
-        float eval = _PerfT(new_pos, depth - 1, std::numeric_limits<float>::lowest(), std::numeric_limits<float>::max(), model);
+        float eval = _PerfT(new_pos, depth - 1, std::numeric_limits<float>::lowest(), std::numeric_limits<float>::max(), model, evaluations_map);
         std::cout << "eval: " << eval << std::endl;
         if (isWhite_var)
         {
             // best_eval = std::max(best_eval, eval);
+            if (eval >= 1) {return new_pos;}
             if (eval > best_eval)
             {
                 best_eval = eval;
@@ -170,6 +172,7 @@ std::string search_best_move(ChessNet &model, std::string pos, int depth)
         }
         else
         {   
+            if (eval <= -1) {return new_pos;}
             if (eval < best_eval)
             {
                 best_eval = eval;

@@ -14,20 +14,62 @@
 #include "../../training/include/chessnet.h"
 #include "../include/data_preparation.h"
 
-// std::vector<std::tuple<Board, BoardStatus, Movelist::EnPassantTarget>> globalMoveList;
+
+ChessPosition createChessPosition(const Board &board,
+                                  const BoardStatus &status,
+                                  const uint64_t &epTarget)
+{
+    // Convert the en passant target into a single-bit bitboard if it's valid
+    // uint64_t epBitboard = 0ULL;
+    // if (status.HasEPPawn && epTarget.squareIndex >= 0 && epTarget.squareIndex < 64)
+    // {
+    //     epBitboard = 1ULL << epTarget.squareIndex;
+    // }
+
+    ChessPosition position = {
+        // White pieces
+        board.WPawn,
+        board.WKnight,
+        board.WBishop,
+        board.WRook,
+        board.WQueen,
+        board.WKing,
+
+        // Black pieces
+        board.BPawn,
+        board.BKnight,
+        board.BBishop,
+        board.BRook,
+        board.BQueen,
+        board.BKing,
+
+        // En passant bitboard
+        epTarget,
+
+        // White to move, from BoardStatus
+        status.WhiteMove,
+
+        // Castling
+        status.WCastleL,
+        status.WCastleR,
+        status.BCastleL,
+        status.BCastleR};
+
+    return position;
+}
 
 class MoveReciever
 {
 public:
 	static inline uint64_t nodes;
-	static inline ChessNet *model;
+	static inline ChessNet model;
 	static inline std::unordered_map<uint64_t, float> *evaluations_map;
 	static inline std::vector<torch::Tensor> inputs;
 
-	static _ForceInline void Init(Board &brd, uint64_t EPInit, ChessNet &trained_model, std::unordered_map<uint64_t, float> &map)
+	static _ForceInline void Init(Board &brd, uint64_t EPInit, ChessNet trained_model, std::unordered_map<uint64_t, float> &map)
 	{
 		MoveReciever::nodes = 0;
-		MoveReciever::model = &trained_model;
+		MoveReciever::model = trained_model;
 		MoveReciever::evaluations_map = &map;
 		if (torch::cuda::is_available())
 		{
@@ -92,22 +134,10 @@ public:
 	template <class BoardStatus status>
 	static _ForceInline float evaluate(Board &brd)
 	{
-		// uint64_t key = combineHash<status>(brd, Movelist::EnPassantTarget);
+		ChessPosition position = createChessPosition(brd, status, Movelist::EnPassantTarget);
 
-		// auto it = evaluations_map->find(key);
-		// if (it != evaluations_map->end())
-		// {
-		// 	std::cout << "Size of evaluations_map: " << evaluations_map->size() << std::endl;
-		// 	std::cout << "Found: Value = " << it->second << std::endl;
-		// 	return it->second;
-		// }
 
-		ChessData positionInBitboards = positionToBitboards<status>(brd);
-		torch::Tensor positionINTensor = bitboardsToTensor(positionInBitboards.bitboards);
-
-		// Reshape the tensor for batch processing (add a batch dimension)
-		// positionINTensor = positionINTensor.unsqueeze(0);
-
+		torch::Tensor positionINTensor = model->toTensor(position);
 		if (torch::cuda::is_available())
 		{
 			positionINTensor = positionINTensor.to(torch::kCUDA);
@@ -372,7 +402,7 @@ public:
 };
 
 template <class BoardStatus status>
-static float PerfT(std::string_view def, Board &brd, int depth, float alpha, float beta, ChessNet &model, std::unordered_map<uint64_t, float> &evaluations_map)
+static float PerfT(std::string_view def, Board &brd, int depth, float alpha, float beta, ChessNet model, std::unordered_map<uint64_t, float> &evaluations_map)
 {
 		MoveReciever::Init(brd, FEN::FenEnpassant(def), model, evaluations_map);
 

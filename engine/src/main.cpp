@@ -7,29 +7,32 @@
 #include <cstring>
 #include <limits>
 #include <memory>
+#include <unordered_map>
 #include "../include/evaluate.h"
 // #include "../include/chessnet.h"
 
 const int PORT = 12346;
 const int BUFFER_SIZE = 1024;
 
+
 void handle_connection(int client_socket) {
     char buffer[BUFFER_SIZE];
 
     // Load the model
-    ChessNet model;
+    std::unordered_map<uint64_t, float> evaluations_map;
+    auto model = ChessNet();
     torch::serialize::InputArchive input_archive;
     try {
-        input_archive.load_from("../../training/NN_weights/model_last.pt");
-        model.load(input_archive);  // Load the weights into the model
-        model.eval();
+        input_archive.load_from("../../training/NN_weights/model_linear_last.pt");
+        model->load(input_archive);  // Load the weights into the model
+        model->eval();
         // Check if CUDA is available
         if (torch::cuda::is_available()) {
-            model.to(torch::kCUDA);
+            model->to(torch::kCUDA);
             std::cout << "Using CUDA" << std::endl;
         } else {
             // If not available, keep on CPU
-            model.to(torch::kCPU);
+            model->to(torch::kCPU);
         }
         std::cout << "Model weights loaded successfully!" << std::endl;
     } catch (const c10::Error& e) {
@@ -69,7 +72,7 @@ void handle_connection(int client_socket) {
 
         // Get the best move FEN from the model
         auto start_time = std::chrono::high_resolution_clock::now();
-        std::string best_move_fen = search_best_move(model, received_fen, 4);  // Depth set to 2 for example
+        std::string best_move_fen = search_best_move(model, received_fen, 4, evaluations_map);  // Depth set to 2 for example
         auto end_time = std::chrono::high_resolution_clock::now();
         std::chrono::duration<float> duration = end_time - start_time;
         std::cout << "Time taken to find best move: " << duration.count() << " seconds." << std::endl;
