@@ -14,48 +14,49 @@
 #include "../../training/include/chessnet.h"
 #include "../include/data_preparation.h"
 
-
 ChessPosition createChessPosition(const Board &board,
-                                  const BoardStatus &status,
-                                  const uint64_t &epTarget)
+								  const BoardStatus &status,
+								  const uint64_t &epTarget)
 {
-    // Convert the en passant target into a single-bit bitboard if it's valid
-    // uint64_t epBitboard = 0ULL;
-    // if (status.HasEPPawn && epTarget.squareIndex >= 0 && epTarget.squareIndex < 64)
-    // {
-    //     epBitboard = 1ULL << epTarget.squareIndex;
-    // }
+	// Convert the en passant target into a single-bit bitboard if it's valid
+	// uint64_t epBitboard = 0ULL;
+	// if (status.HasEPPawn && epTarget.squareIndex >= 0 && epTarget.squareIndex < 64)
+	// {
+	//     epBitboard = 1ULL << epTarget.squareIndex;
+	// }
 
-    ChessPosition position = {
-        // White pieces
-        board.WPawn,
-        board.WKnight,
-        board.WBishop,
-        board.WRook,
-        board.WQueen,
-        board.WKing,
+	ChessPosition position = {
+		// White pieces
+		rotate180(board.WPawn, status.WhiteMove),
+		rotate180(board.WKnight, status.WhiteMove),
+		rotate180(board.WBishop, status.WhiteMove),
+		rotate180(board.WRook, status.WhiteMove),
+		rotate180(board.WQueen, status.WhiteMove),
+		rotate180(board.WKing, status.WhiteMove),
 
-        // Black pieces
-        board.BPawn,
-        board.BKnight,
-        board.BBishop,
-        board.BRook,
-        board.BQueen,
-        board.BKing,
+		// Black pieces
+		rotate180(board.BPawn, status.WhiteMove),
+		rotate180(board.BKnight, status.WhiteMove),
+		rotate180(board.BBishop, status.WhiteMove),
+		rotate180(board.BRook, status.WhiteMove),
+		rotate180(board.BQueen, status.WhiteMove),
+		rotate180(board.BKing, status.WhiteMove),
 
-        // En passant bitboard
-        epTarget,
+		// En passant bitboard
+		rotate180(epTarget, status.WhiteMove),
 
-        // White to move, from BoardStatus
-        status.WhiteMove,
+		// White to move, from BoardStatus
+		status.WhiteMove,
 
-        // Castling
-        status.WCastleL,
-        status.WCastleR,
-        status.BCastleL,
-        status.BCastleR};
-
-    return position;
+		// Castling
+		// If WhiteMove == true, use white's castling flags for WCastle*
+		// and black's for BCastle*; if WhiteMove == false, swap them:
+		status.WhiteMove ? status.WCastleL : status.BCastleL, // WCastleL
+		status.WhiteMove ? status.WCastleR : status.BCastleR, // WCastleR
+		status.WhiteMove ? status.BCastleL : status.WCastleL, // BCastleL
+		status.WhiteMove ? status.BCastleR : status.WCastleR  // BCastleR
+	};
+	return position;
 }
 
 class MoveReciever
@@ -136,7 +137,6 @@ public:
 	{
 		ChessPosition position = createChessPosition(brd, status, Movelist::EnPassantTarget);
 
-
 		torch::Tensor positionINTensor = model->toTensor(position);
 		if (torch::cuda::is_available())
 		{
@@ -162,7 +162,7 @@ public:
 		torch::Tensor batch_inputs = torch::stack(inputs);
 		torch::Tensor output = model->forward(batch_inputs);
 		inputs.clear();
-		
+
 		if constexpr (status.WhiteMove)
 		{
 			// For White's move, return the highest evaluation
@@ -404,7 +404,7 @@ public:
 template <class BoardStatus status>
 static float PerfT(std::string_view def, Board &brd, int depth, float alpha, float beta, ChessNet model, std::unordered_map<uint64_t, float> &evaluations_map)
 {
-		MoveReciever::Init(brd, FEN::FenEnpassant(def), model, evaluations_map);
+	MoveReciever::Init(brd, FEN::FenEnpassant(def), model, evaluations_map);
 
 	switch (depth)
 	{

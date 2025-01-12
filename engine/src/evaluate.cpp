@@ -180,7 +180,7 @@ std::string search_best_move(ChessNet model, std::string pos, int depth, std::un
             }
         }
     }
-    std::cout << "najlepszy" << best_move << std::endl;
+    std::cout << "najlepszy: " << best_move << std::endl;
     std::cout << "eval: " << best_eval << std::endl;
     return best_move;
 }
