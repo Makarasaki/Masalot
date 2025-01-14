@@ -119,8 +119,7 @@ BatchData load_data(sqlite3 *db, int batch_size, int batch, ChessNet net, torch:
         "       b_p_bitboard, b_n_bitboard, b_b_bitboard, b_r_bitboard, b_q_bitboard, b_k_bitboard, "
         "       en_passant_bitboard, castling_KW, castling_QW, castling_kb, castling_qb, WhitesTurn, "
         "       eval_scaled, FEN "
-        "FROM evaluations_rand "
-        "WHERE WhitesTurn = 1 "
+        "FROM training_dataset "
         "LIMIT ? OFFSET ?";
 
     // Prepare statement
