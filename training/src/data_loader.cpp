@@ -186,6 +186,9 @@ BatchData load_data(sqlite3 *db, int batch_size, int batch, ChessNet net, torch:
         };
         // Load evaluation (column 18)
         float evaluation = static_cast<float>(sqlite3_column_double(stmt, 18));
+        // positive means good position for side that is now doing move
+        // so flip the evaluatiion around 0 if it's blacks move 
+        evaluation *= whiteMove ? 1.0f : -1.0f;
 
         // Convert ChessPosition to a [837]-sized Tensor
         torch::Tensor input_tensor;
