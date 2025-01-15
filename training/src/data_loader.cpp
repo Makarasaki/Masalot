@@ -167,22 +167,22 @@ BatchData load_data(sqlite3 *db, int batch_size, int batch, ChessNet net, torch:
             // WCastleL
             whiteMove
                 ? static_cast<bool>(sqlite3_column_int(stmt, 13))  // WCastleL
-                : static_cast<bool>(sqlite3_column_int(stmt, 15)), // BCastleL
+                : static_cast<bool>(sqlite3_column_int(stmt, 16)), // BCastleR
 
             // WCastleR
             whiteMove
                 ? static_cast<bool>(sqlite3_column_int(stmt, 14))  // WCastleR
-                : static_cast<bool>(sqlite3_column_int(stmt, 16)), // BCastleR
+                : static_cast<bool>(sqlite3_column_int(stmt, 15)), // BCastleL
 
             // BCastleL
             whiteMove
                 ? static_cast<bool>(sqlite3_column_int(stmt, 15))  // BCastleL
-                : static_cast<bool>(sqlite3_column_int(stmt, 13)), // WCastleL
+                : static_cast<bool>(sqlite3_column_int(stmt, 14)), // WCastleR
 
             // BCastleR
             whiteMove
                 ? static_cast<bool>(sqlite3_column_int(stmt, 16)) // BCastleR
-                : static_cast<bool>(sqlite3_column_int(stmt, 14)) // WCastleR
+                : static_cast<bool>(sqlite3_column_int(stmt, 13)) // WCastleL
         };
         // Load evaluation (column 18)
         float evaluation = static_cast<float>(sqlite3_column_double(stmt, 18));

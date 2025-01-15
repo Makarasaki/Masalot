@@ -51,10 +51,10 @@ ChessPosition createChessPosition(const Board &board,
 		// Castling
 		// If WhiteMove == true, use white's castling flags for WCastle*
 		// and black's for BCastle*; if WhiteMove == false, swap them:
-		status.WhiteMove ? status.WCastleL : status.BCastleL, // WCastleL
-		status.WhiteMove ? status.WCastleR : status.BCastleR, // WCastleR
-		status.WhiteMove ? status.BCastleL : status.WCastleL, // BCastleL
-		status.WhiteMove ? status.BCastleR : status.WCastleR  // BCastleR
+		status.WhiteMove ? status.WCastleL : status.BCastleR, // WCastleR
+		status.WhiteMove ? status.WCastleR : status.BCastleL, // WCastleL
+		status.WhiteMove ? status.BCastleL : status.WCastleR, // BCastleR
+		status.WhiteMove ? status.BCastleR : status.WCastleL  // BCastleL
 	};
 	return position;
 }
