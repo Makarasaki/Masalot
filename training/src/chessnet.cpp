@@ -1,6 +1,63 @@
 #include "../include/chessnet.h"
 #include <iostream>
 
+std::vector<std::vector<int>> intToBitboard(uint64_t bitboard)
+{
+    std::vector<std::vector<int>> board(8, std::vector<int>(8, 0));
+    for (int row = 0; row < 8; row++)
+    {
+        for (int col = 0; col < 8; col++)
+        {
+            // Extract each bit and place it in the 8x8 matrix
+            board[row][col] = (bitboard >> (row * 8 + col)) & 1;
+        }
+    }
+    return board;
+}
+
+std::vector<std::vector<int>> intToBitboardWhites(uint64_t bitboard)
+{
+    std::vector<std::vector<int>> board(8, std::vector<int>(8, 0));
+    // std::cout << "INT to w bitboard: " << std::endl;
+    for (int row = 0; row < 8; row++)
+    {
+        for (int col = 0; col < 8; col++)
+        {
+            // Extract each bit and place it in the 8x8 matrix
+            board[row][col] = (bitboard >> (row * 8 + col)) & 1;
+            // std::cout << board[row][col];
+        }
+        // std::cout << std::endl;
+    }
+    return board;
+}
+
+std::vector<std::vector<int>> intToBitboardBlacks(uint64_t bitboard)
+{
+    std::vector<std::vector<int>> board(8, std::vector<int>(8, 0));
+    for (int row = 0; row < 8; row++)
+    {
+        for (int col = 0; col < 8; col++)
+        {
+            // Extract each bit and place it in the 8x8 matrix
+            board[row][col] = (bitboard >> (row * 8 + col)) & 1 ? -1 : 0;
+        }
+    }
+    return board;
+}
+
+// White bitboard -> +1 for each set bit
+std::vector<int> intToVector64White(uint64_t bitboard)
+{
+    std::vector<int> vec(64, 0);
+    for (int i = 0; i < 64; i++)
+    {
+        // Check if bit i is set, then store +1 in that position
+        vec[i] = ((bitboard >> i) & 1ULL) ? 1 : 0;
+    }
+    return vec;
+}
+
 // ------------------------------------------
 // ChessNetConv (Convolution-based)
 // ------------------------------------------
@@ -118,22 +175,47 @@ void ChessNetConvImpl::initialize_weights()
     }
 }
 
-// Optional helper to convert bitboards -> Tensor
-torch::Tensor ChessNetConvImpl::toTensor(
-    const std::vector<std::vector<std::vector<int>>> &bitboards)
+torch::Tensor ChessNetConvImpl::toTensor(const ChessPosition &position)
 {
-    int n = bitboards.size(); // number of bitboards
-    // Create a [n, 8, 8] float32 tensor
-    torch::Tensor tensor = torch::empty({n, 8, 8}, torch::kFloat32);
 
+    // Convert each 64-bit bitboard into an 8x8 2D vector of ints
+    auto wPawn    = intToBitboardWhites(position.WPawn);
+    auto wKnight  = intToBitboardWhites(position.WKnight);
+    auto wBishop  = intToBitboardWhites(position.WBishop);
+    auto wRook    = intToBitboardWhites(position.WRook);
+    auto wQueen   = intToBitboardWhites(position.WQueen);
+    auto wKing    = intToBitboardWhites(position.WKing);
+
+    auto bPawn    = intToBitboardBlacks(position.BPawn);
+    auto bKnight  = intToBitboardBlacks(position.BKnight);
+    auto bBishop  = intToBitboardBlacks(position.BBishop);
+    auto bRook    = intToBitboardBlacks(position.BRook);
+    auto bQueen   = intToBitboardBlacks(position.BQueen);
+    auto bKing    = intToBitboardBlacks(position.BKing);
+
+    auto enPassant = intToBitboard(position.EnPassant); // neutral => 0 or 1
+
+    // We collect them into a single container for easier iteration
+    // Each element is an 8x8 matrix (std::vector<std::vector<int>>)
+    std::vector<std::vector<std::vector<int>>> allBoards = {
+        wPawn, wKnight, wBishop, wRook, wQueen, wKing,
+        bPawn, bKnight, bBishop, bRook, bQueen, bKing,
+        enPassant
+    };
+
+    // Create a float32 tensor of shape [13, 8, 8]
+    auto channels = static_cast<int>(allBoards.size()); // should be 13
+    torch::Tensor tensor = torch::empty({channels, 8, 8}, torch::kFloat32);
     auto accessor = tensor.accessor<float, 3>();
-    for (int i = 0; i < n; ++i)
+
+    // Copy data from each 8×8 board into the tensor
+    for (int c = 0; c < channels; ++c)
     {
-        for (int j = 0; j < 8; ++j)
+        for (int row = 0; row < 8; ++row)
         {
-            for (int k = 0; k < 8; ++k)
+            for (int col = 0; col < 8; ++col)
             {
-                accessor[i][j][k] = static_cast<float>(bitboards[i][j][k]);
+                accessor[c][row][col] = static_cast<float>(allBoards[c][row][col]);
             }
         }
     }
@@ -294,10 +376,10 @@ torch::Tensor ChessNetLinearImpl::toTensor(const ChessPosition &position)
     process(position.EnPassant, false);
 
     // Add castling rights and WhiteMove as final five entries
-    bitboards[832] = position.WCastleL ? 1 : 0;
-    bitboards[833] = position.WCastleR ? 1 : 0;
-    bitboards[834] = position.BCastleL ? 1 : 0;
-    bitboards[835] = position.BCastleR ? 1 : 0;
+    bitboards[832] = position.MyCastleL ? 1 : 0;
+    bitboards[833] = position.MyCastleR ? 1 : 0;
+    bitboards[834] = position.EnemyCastleL ? 1 : 0;
+    bitboards[835] = position.EnemyCastleR ? 1 : 0;
     bitboards[836] = position.WhiteMove ? 1 : 0;
 
     // Must have 837 elements

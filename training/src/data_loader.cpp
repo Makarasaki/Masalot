@@ -3,62 +3,62 @@
 #include <iostream>
 
 // Function to convert a 64-bit integer into an 8x8 bitboard (2D vector)
-std::vector<std::vector<int>> intToBitboard(uint64_t bitboard)
-{
-    std::vector<std::vector<int>> board(8, std::vector<int>(8, 0));
-    for (int row = 0; row < 8; row++)
-    {
-        for (int col = 0; col < 8; col++)
-        {
-            // Extract each bit and place it in the 8x8 matrix
-            board[row][col] = (bitboard >> (row * 8 + col)) & 1;
-        }
-    }
-    return board;
-}
+// std::vector<std::vector<int>> intToBitboard(uint64_t bitboard)
+// {
+//     std::vector<std::vector<int>> board(8, std::vector<int>(8, 0));
+//     for (int row = 0; row < 8; row++)
+//     {
+//         for (int col = 0; col < 8; col++)
+//         {
+//             // Extract each bit and place it in the 8x8 matrix
+//             board[row][col] = (bitboard >> (row * 8 + col)) & 1;
+//         }
+//     }
+//     return board;
+// }
 
-std::vector<std::vector<int>> intToBitboardWhites(uint64_t bitboard)
-{
-    std::vector<std::vector<int>> board(8, std::vector<int>(8, 0));
-    // std::cout << "INT to w bitboard: " << std::endl;
-    for (int row = 0; row < 8; row++)
-    {
-        for (int col = 0; col < 8; col++)
-        {
-            // Extract each bit and place it in the 8x8 matrix
-            board[row][col] = (bitboard >> (row * 8 + col)) & 1;
-            // std::cout << board[row][col];
-        }
-        // std::cout << std::endl;
-    }
-    return board;
-}
+// std::vector<std::vector<int>> intToBitboardWhites(uint64_t bitboard)
+// {
+//     std::vector<std::vector<int>> board(8, std::vector<int>(8, 0));
+//     // std::cout << "INT to w bitboard: " << std::endl;
+//     for (int row = 0; row < 8; row++)
+//     {
+//         for (int col = 0; col < 8; col++)
+//         {
+//             // Extract each bit and place it in the 8x8 matrix
+//             board[row][col] = (bitboard >> (row * 8 + col)) & 1;
+//             // std::cout << board[row][col];
+//         }
+//         // std::cout << std::endl;
+//     }
+//     return board;
+// }
 
-std::vector<std::vector<int>> intToBitboardBlacks(uint64_t bitboard)
-{
-    std::vector<std::vector<int>> board(8, std::vector<int>(8, 0));
-    for (int row = 0; row < 8; row++)
-    {
-        for (int col = 0; col < 8; col++)
-        {
-            // Extract each bit and place it in the 8x8 matrix
-            board[row][col] = (bitboard >> (row * 8 + col)) & 1 ? -1 : 0;
-        }
-    }
-    return board;
-}
+// std::vector<std::vector<int>> intToBitboardBlacks(uint64_t bitboard)
+// {
+//     std::vector<std::vector<int>> board(8, std::vector<int>(8, 0));
+//     for (int row = 0; row < 8; row++)
+//     {
+//         for (int col = 0; col < 8; col++)
+//         {
+//             // Extract each bit and place it in the 8x8 matrix
+//             board[row][col] = (bitboard >> (row * 8 + col)) & 1 ? -1 : 0;
+//         }
+//     }
+//     return board;
+// }
 
-// White bitboard -> +1 for each set bit
-std::vector<int> intToVector64White(uint64_t bitboard)
-{
-    std::vector<int> vec(64, 0);
-    for (int i = 0; i < 64; i++)
-    {
-        // Check if bit i is set, then store +1 in that position
-        vec[i] = ((bitboard >> i) & 1ULL) ? 1 : 0;
-    }
-    return vec;
-}
+// // White bitboard -> +1 for each set bit
+// std::vector<int> intToVector64White(uint64_t bitboard)
+// {
+//     std::vector<int> vec(64, 0);
+//     for (int i = 0; i < 64; i++)
+//     {
+//         // Check if bit i is set, then store +1 in that position
+//         vec[i] = ((bitboard >> i) & 1ULL) ? 1 : 0;
+//     }
+//     return vec;
+// }
 
 // Black bitboard -> -1 for each set bit
 std::vector<int> intToVector64Black(uint64_t bitboard)
@@ -195,7 +195,7 @@ BatchData load_data(sqlite3 *db, int batch_size, int batch, ChessNet net, torch:
         try
         {
             // Now that 'net' is a shared pointer, call member functions via '->'
-            input_tensor = net->toTensor(chess_position); // shape [837]
+            input_tensor = net->toTensor(position); // shape [837]
         }
         catch (const std::exception &e)
         {
@@ -270,25 +270,25 @@ BatchData load_data(sqlite3 *db, int batch_size, int batch, ChessNet net, torch:
 //     while (sqlite3_step(stmt) == SQLITE_ROW) {
 //         ChessData entry;
 //         uint64_t allOnes = ~0ULL;
-//         entry.bitboards.resize(13);  // 14 bitboards for each position
+        // entry.bitboards.resize(13);  // 14 bitboards for each position
 
-//         // Convert each bitboard (64-bit integer) into an 8x8 vector
-//         for (int i = 0; i < 6; ++i) {
-//             uint64_t bitboard = static_cast<uint64_t>(sqlite3_column_int64(stmt, i));
-//             entry.bitboards[i] = intToBitboardWhites(bitboard);  // Convert to 8x8 bitboard
-//         }
+        // // Convert each bitboard (64-bit integer) into an 8x8 vector
+        // for (int i = 0; i < 6; ++i) {
+        //     uint64_t bitboard = static_cast<uint64_t>(sqlite3_column_int64(stmt, i));
+        //     entry.bitboards[i] = intToBitboardWhites(bitboard);  // Convert to 8x8 bitboard
+        // }
 
-//         for (int i = 6; i < 12; ++i) {
-//             uint64_t bitboard = static_cast<uint64_t>(sqlite3_column_int64(stmt, i));
-//             entry.bitboards[i] = intToBitboardBlacks(bitboard);  // Convert to 8x8 bitboard
-//         }
+        // for (int i = 6; i < 12; ++i) {
+        //     uint64_t bitboard = static_cast<uint64_t>(sqlite3_column_int64(stmt, i));
+        //     entry.bitboards[i] = intToBitboardBlacks(bitboard);  // Convert to 8x8 bitboard
+        // }
 
-//         entry.bitboards[12] = intToBitboard(static_cast<uint64_t>(sqlite3_column_int64(stmt, 12)));  // En Passant
+        // entry.bitboards[12] = intToBitboard(static_cast<uint64_t>(sqlite3_column_int64(stmt, 12)));  // En Passant
 
-//         entry.evaluation = static_cast<float>(sqlite3_column_double(stmt, 18));
-//         // std::cout << entry.evaluation << std::endl;
-//         // Add the entry to the batch
-//         data_batch.push_back(entry);
+        // entry.evaluation = static_cast<float>(sqlite3_column_double(stmt, 18));
+        // // std::cout << entry.evaluation << std::endl;
+        // // Add the entry to the batch
+        // data_batch.push_back(entry);
 //     }
 
 //     // Finalize SQL statement

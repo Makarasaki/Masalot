@@ -90,12 +90,20 @@ struct ChessPosition {
     const uint64_t EnPassant;
     const bool WhiteMove;
 
-    const bool WCastleL;
-    const bool WCastleR;
+    const bool MyCastleL;
+    const bool MyCastleR;
 
-    const bool BCastleL;
-    const bool BCastleR;
+    const bool EnemyCastleL;
+    const bool EnemyCastleR;
 };
+
+std::vector<std::vector<int>> intToBitboard(uint64_t bitboard);
+
+std::vector<std::vector<int>> intToBitboardWhites(uint64_t bitboard);
+
+std::vector<std::vector<int>> intToBitboardBlacks(uint64_t bitboard);
+
+std::vector<int> intToVector64White(uint64_t bitboard);
 
 // ----------------------------------------------
 // Convolution-based ChessNet (updated as a class)
@@ -112,7 +120,7 @@ public:
     void initialize_weights();
 
     // Optional static helper for converting bitboards to a tensor
-    static torch::Tensor toTensor(const std::vector<std::vector<std::vector<int>>>& bitboards);
+    torch::Tensor toTensor(const ChessPosition &position);
 
 private:
     // Convolutional layers
@@ -173,6 +181,6 @@ uint64_t rotate180(uint64_t board, bool isWhite);
 
 // board and status to chess position
 
-using ChessNet = ChessNetLinear;
+using ChessNet = ChessNetConv;
 
 #endif // CHESSNET_H
