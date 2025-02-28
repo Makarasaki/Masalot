@@ -61,48 +61,48 @@
 // }
 
 // Black bitboard -> -1 for each set bit
-std::vector<int> intToVector64Black(uint64_t bitboard)
-{
-    std::vector<int> vec(64, 0);
-    for (int i = 0; i < 64; i++)
-    {
-        // Check if bit i is set, then store -1 in that position
-        vec[i] = ((bitboard >> i) & 1ULL) ? -1 : 0;
-    }
-    return vec;
-}
+// std::vector<int> intToVector64Black(uint64_t bitboard)
+// {
+//     std::vector<int> vec(64, 0);
+//     for (int i = 0; i < 64; i++)
+//     {
+//         // Check if bit i is set, then store -1 in that position
+//         vec[i] = ((bitboard >> i) & 1ULL) ? -1 : 0;
+//     }
+//     return vec;
+// }
 
-// Neutral (e.g., en-passant) -> +1 for each set bit
-std::vector<int> intToVector64(uint64_t bitboard)
-{
-    std::vector<int> vec(64, 0);
-    for (int i = 0; i < 64; i++)
-    {
-        // Check if bit i is set, then store +1 in that position
-        vec[i] = ((bitboard >> i) & 1ULL) ? 1 : 0;
-    }
-    return vec;
-}
+// // Neutral (e.g., en-passant) -> +1 for each set bit
+// std::vector<int> intToVector64(uint64_t bitboard)
+// {
+//     std::vector<int> vec(64, 0);
+//     for (int i = 0; i < 64; i++)
+//     {
+//         // Check if bit i is set, then store +1 in that position
+//         vec[i] = ((bitboard >> i) & 1ULL) ? 1 : 0;
+//     }
+//     return vec;
+// }
 
-std::vector<std::vector<std::vector<int>>> info_to_bitboards(int info)
-{
-    // Create a vector to hold the 8x8 bitboards for each bit
-    std::vector<std::vector<std::vector<int>>> bitboards;
+// std::vector<std::vector<std::vector<int>>> info_to_bitboards(int info)
+// {
+//     // Create a vector to hold the 8x8 bitboards for each bit
+//     std::vector<std::vector<std::vector<int>>> bitboards;
 
-    // Loop through each bit and create an 8x8 matrix based on the bit value
-    for (int bit = 0; bit < 5; bit++)
-    {
-        bool bit_value = (info >> bit) & 1;
-        // std::cout << "info bits" << bit_value << std::endl;
-        // Create an 8x8 matrix filled with the bit value
-        std::vector<std::vector<int>> bitboard(8, std::vector<int>(8, bit_value ? 1 : 0));
-        bitboards.push_back(bitboard);
-    }
+//     // Loop through each bit and create an 8x8 matrix based on the bit value
+//     for (int bit = 0; bit < 5; bit++)
+//     {
+//         bool bit_value = (info >> bit) & 1;
+//         // std::cout << "info bits" << bit_value << std::endl;
+//         // Create an 8x8 matrix filled with the bit value
+//         std::vector<std::vector<int>> bitboard(8, std::vector<int>(8, bit_value ? 1 : 0));
+//         bitboards.push_back(bitboard);
+//     }
 
-    return bitboards;
-}
+//     return bitboards;
+// }
 
-BatchData load_data(sqlite3 *db, int batch_size, int batch, ChessNet net, torch::Device device)
+BatchData load_data(sqlite3 *db, int batch_size, int lastRowid, ChessNet net, torch::Device device)
 {
     BatchData batch_data; // Will hold final (inputs, targets) Tensors
     std::vector<torch::Tensor> inputs;
@@ -111,16 +111,21 @@ BatchData load_data(sqlite3 *db, int batch_size, int batch, ChessNet net, torch:
     sqlite3_stmt *stmt;
 
     // Calculate offset for pagination
-    int offset = batch * batch_size;
+    // int offset = batch * batch_size;
+
+    int offset = lastRowid;
 
     // SQL to retrieve rows
-    const char *sql =
+    const char *sql = 
         "SELECT w_P_bitboard, w_N_bitboard, w_B_bitboard, w_R_bitboard, w_Q_bitboard, w_K_bitboard, "
         "       b_p_bitboard, b_n_bitboard, b_b_bitboard, b_r_bitboard, b_q_bitboard, b_k_bitboard, "
         "       en_passant_bitboard, castling_KW, castling_QW, castling_kb, castling_qb, WhitesTurn, "
-        "       eval_scaled, FEN "
-        "FROM training_dataset "
-        "LIMIT ? OFFSET ?";
+        "       eval_scaled, FEN, rowid "
+        "FROM merged_shuffled_dataset "
+        "WHERE rowid > ? "
+        // "AND WhitesTurn == 1 "
+        "ORDER BY rowid "
+        "LIMIT ?";
 
     // Prepare statement
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK)
@@ -130,65 +135,101 @@ BatchData load_data(sqlite3 *db, int batch_size, int batch, ChessNet net, torch:
     }
 
     // Bind batch size and offset
-    sqlite3_bind_int(stmt, 1, batch_size);
-    sqlite3_bind_int(stmt, 2, offset);
+    sqlite3_bind_int(stmt, 1, offset);
+    sqlite3_bind_int(stmt, 2, batch_size);
 
     int row_count = 0;
+    int64_t lastRowIdCaptured = 0;
 
     // Fetch rows
     while (sqlite3_step(stmt) == SQLITE_ROW && row_count < batch_size)
     {
+        int64_t lastRowId = sqlite3_column_int64(stmt, 20);
+
+        lastRowIdCaptured = lastRowId;
         // Build ChessPosition from current row
         bool whiteMove = static_cast<bool>(sqlite3_column_int(stmt, 17));
 
-        ChessPosition position = {
-            // White pieces
-            rotate180(static_cast<uint64_t>(sqlite3_column_int64(stmt, 0)), whiteMove), // WPawn
-            rotate180(static_cast<uint64_t>(sqlite3_column_int64(stmt, 1)), whiteMove), // WKnight
-            rotate180(static_cast<uint64_t>(sqlite3_column_int64(stmt, 2)), whiteMove), // WBishop
-            rotate180(static_cast<uint64_t>(sqlite3_column_int64(stmt, 3)), whiteMove), // WRook
-            rotate180(static_cast<uint64_t>(sqlite3_column_int64(stmt, 4)), whiteMove), // WQueen
-            rotate180(static_cast<uint64_t>(sqlite3_column_int64(stmt, 5)), whiteMove), // WKing
+        ChessPosition position = [&]()
+        {
+            if (whiteMove)
+            {
+                return ChessPosition(
+                    // White pieces
+                    static_cast<uint64_t>(sqlite3_column_int64(stmt, 0)), // WPawn
+                    static_cast<uint64_t>(sqlite3_column_int64(stmt, 1)), // WKnight
+                    static_cast<uint64_t>(sqlite3_column_int64(stmt, 2)), // WBishop
+                    static_cast<uint64_t>(sqlite3_column_int64(stmt, 3)), // WRook
+                    static_cast<uint64_t>(sqlite3_column_int64(stmt, 4)), // WQueen
+                    static_cast<uint64_t>(sqlite3_column_int64(stmt, 5)), // WKing
 
-            // Black pieces
-            rotate180(static_cast<uint64_t>(sqlite3_column_int64(stmt, 6)), whiteMove),  // BPawn
-            rotate180(static_cast<uint64_t>(sqlite3_column_int64(stmt, 7)), whiteMove),  // BKnight
-            rotate180(static_cast<uint64_t>(sqlite3_column_int64(stmt, 8)), whiteMove),  // BBishop
-            rotate180(static_cast<uint64_t>(sqlite3_column_int64(stmt, 9)), whiteMove),  // BRook
-            rotate180(static_cast<uint64_t>(sqlite3_column_int64(stmt, 10)), whiteMove), // BQueen
-            rotate180(static_cast<uint64_t>(sqlite3_column_int64(stmt, 11)), whiteMove), // BKing
+                    // Black pieces
+                    static_cast<uint64_t>(sqlite3_column_int64(stmt, 6)),  // BPawn
+                    static_cast<uint64_t>(sqlite3_column_int64(stmt, 7)),  // BKnight
+                    static_cast<uint64_t>(sqlite3_column_int64(stmt, 8)),  // BBishop
+                    static_cast<uint64_t>(sqlite3_column_int64(stmt, 9)),  // BRook
+                    static_cast<uint64_t>(sqlite3_column_int64(stmt, 10)), // BQueen
+                    static_cast<uint64_t>(sqlite3_column_int64(stmt, 11)), // BKing
 
-            // En passant bitboard
-            rotate180(static_cast<uint64_t>(sqlite3_column_int64(stmt, 12)), whiteMove),
+                    // En passant bitboard
+                    static_cast<uint64_t>(sqlite3_column_int64(stmt, 12)),
 
-            // WhiteMove
-            whiteMove,
+                    // WhiteMove
+                    whiteMove,
 
-            // WCastleL
-            whiteMove
-                ? static_cast<bool>(sqlite3_column_int(stmt, 13))  // WCastleL
-                : static_cast<bool>(sqlite3_column_int(stmt, 16)), // BCastleR
+                    // MyCastleL / MyCastleR
+                    static_cast<bool>(sqlite3_column_int(stmt, 13)), // WCastleL
+                    static_cast<bool>(sqlite3_column_int(stmt, 14)), // WCastleR
 
-            // WCastleR
-            whiteMove
-                ? static_cast<bool>(sqlite3_column_int(stmt, 14))  // WCastleR
-                : static_cast<bool>(sqlite3_column_int(stmt, 15)), // BCastleL
+                    // EnemyCastleL / EnemyCastleR
+                    static_cast<bool>(sqlite3_column_int(stmt, 15)), // BCastleL
+                    static_cast<bool>(sqlite3_column_int(stmt, 16))  // BCastleR
+                );
+            }
+            else
+            {
+                return ChessPosition(
+                    // Black pieces first, but flipped
+                    flipVertical(static_cast<uint64_t>(sqlite3_column_int64(stmt, 6)), whiteMove),  // BPawn
+                    flipVertical(static_cast<uint64_t>(sqlite3_column_int64(stmt, 7)), whiteMove),  // BKnight
+                    flipVertical(static_cast<uint64_t>(sqlite3_column_int64(stmt, 8)), whiteMove),  // BBishop
+                    flipVertical(static_cast<uint64_t>(sqlite3_column_int64(stmt, 9)), whiteMove),  // BRook
+                    flipVertical(static_cast<uint64_t>(sqlite3_column_int64(stmt, 10)), whiteMove), // BQueen
+                    flipVertical(static_cast<uint64_t>(sqlite3_column_int64(stmt, 11)), whiteMove), // BKing
 
-            // BCastleL
-            whiteMove
-                ? static_cast<bool>(sqlite3_column_int(stmt, 15))  // BCastleL
-                : static_cast<bool>(sqlite3_column_int(stmt, 14)), // WCastleR
+                    // Then white pieces, but flipped
+                    flipVertical(static_cast<uint64_t>(sqlite3_column_int64(stmt, 0)), whiteMove), // WPawn
+                    flipVertical(static_cast<uint64_t>(sqlite3_column_int64(stmt, 1)), whiteMove), // WKnight
+                    flipVertical(static_cast<uint64_t>(sqlite3_column_int64(stmt, 2)), whiteMove), // WBishop
+                    flipVertical(static_cast<uint64_t>(sqlite3_column_int64(stmt, 3)), whiteMove), // WRook
+                    flipVertical(static_cast<uint64_t>(sqlite3_column_int64(stmt, 4)), whiteMove), // WQueen
+                    flipVertical(static_cast<uint64_t>(sqlite3_column_int64(stmt, 5)), whiteMove), // WKing
 
-            // BCastleR
-            whiteMove
-                ? static_cast<bool>(sqlite3_column_int(stmt, 16)) // BCastleR
-                : static_cast<bool>(sqlite3_column_int(stmt, 13)) // WCastleL
-        };
+                    // En passant bitboard
+                    flipVertical(static_cast<uint64_t>(sqlite3_column_int64(stmt, 12)), whiteMove),
+
+                    // WhiteMove
+                    whiteMove,
+
+                    // Now BCastleL/BCastleR become MyCastleL/MyCastleR
+                    static_cast<bool>(sqlite3_column_int(stmt, 15)), // BCastleL
+                    static_cast<bool>(sqlite3_column_int(stmt, 16)), // BCastleR
+
+                    // And WCastleL/WCastleR become EnemyCastleL/EnemyCastleR
+                    static_cast<bool>(sqlite3_column_int(stmt, 13)), // WCastleL
+                    static_cast<bool>(sqlite3_column_int(stmt, 14))  // WCastleR
+                );
+            }
+        }();
+
         // Load evaluation (column 18)
         float evaluation = static_cast<float>(sqlite3_column_double(stmt, 18));
         // positive means good position for side that is now doing move
-        // so flip the evaluatiion around 0 if it's blacks move 
+        // so flip the evaluatiion around 0 if it's blacks move
         evaluation *= whiteMove ? 1.0f : -1.0f;
+
+        // std::cout << "FEN: " << sqlite3_column_text(stmt, 19) << std::endl;
+        // std::cout << "eval true: " << evaluation << std::endl;
 
         // Convert ChessPosition to a [837]-sized Tensor
         torch::Tensor input_tensor;
@@ -235,6 +276,10 @@ BatchData load_data(sqlite3 *db, int batch_size, int batch, ChessNet net, torch:
     // Stack target Tensors into shape [row_count]
     batch_data.targets = torch::stack(targets, /*dim=*/0).squeeze(-1);
 
+    std::cout << "last rowid:" <<  lastRowIdCaptured << std::endl;
+
+    batch_data.last_rowid = lastRowIdCaptured;
+
     // Debug: show first row or shapes if needed
     // std::cout << batch_data.inputs[0] << std::endl;
 
@@ -270,25 +315,25 @@ BatchData load_data(sqlite3 *db, int batch_size, int batch, ChessNet net, torch:
 //     while (sqlite3_step(stmt) == SQLITE_ROW) {
 //         ChessData entry;
 //         uint64_t allOnes = ~0ULL;
-        // entry.bitboards.resize(13);  // 14 bitboards for each position
+// entry.bitboards.resize(13);  // 14 bitboards for each position
 
-        // // Convert each bitboard (64-bit integer) into an 8x8 vector
-        // for (int i = 0; i < 6; ++i) {
-        //     uint64_t bitboard = static_cast<uint64_t>(sqlite3_column_int64(stmt, i));
-        //     entry.bitboards[i] = intToBitboardWhites(bitboard);  // Convert to 8x8 bitboard
-        // }
+// // Convert each bitboard (64-bit integer) into an 8x8 vector
+// for (int i = 0; i < 6; ++i) {
+//     uint64_t bitboard = static_cast<uint64_t>(sqlite3_column_int64(stmt, i));
+//     entry.bitboards[i] = intToBitboardWhites(bitboard);  // Convert to 8x8 bitboard
+// }
 
-        // for (int i = 6; i < 12; ++i) {
-        //     uint64_t bitboard = static_cast<uint64_t>(sqlite3_column_int64(stmt, i));
-        //     entry.bitboards[i] = intToBitboardBlacks(bitboard);  // Convert to 8x8 bitboard
-        // }
+// for (int i = 6; i < 12; ++i) {
+//     uint64_t bitboard = static_cast<uint64_t>(sqlite3_column_int64(stmt, i));
+//     entry.bitboards[i] = intToBitboardBlacks(bitboard);  // Convert to 8x8 bitboard
+// }
 
-        // entry.bitboards[12] = intToBitboard(static_cast<uint64_t>(sqlite3_column_int64(stmt, 12)));  // En Passant
+// entry.bitboards[12] = intToBitboard(static_cast<uint64_t>(sqlite3_column_int64(stmt, 12)));  // En Passant
 
-        // entry.evaluation = static_cast<float>(sqlite3_column_double(stmt, 18));
-        // // std::cout << entry.evaluation << std::endl;
-        // // Add the entry to the batch
-        // data_batch.push_back(entry);
+// entry.evaluation = static_cast<float>(sqlite3_column_double(stmt, 18));
+// // std::cout << entry.evaluation << std::endl;
+// // Add the entry to the batch
+// data_batch.push_back(entry);
 //     }
 
 //     // Finalize SQL statement

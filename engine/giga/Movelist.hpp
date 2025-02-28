@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdlib> // For rand()
 #include "Chess_Base.hpp"
 #include "Movegen.hpp"
 
@@ -13,6 +14,18 @@ namespace Movestack
 
 namespace Movelist
 {
+    static constexpr uint8_t MVV_LVA[7][7] = {
+        // Attacker:
+        // PAWN; KNIGHT; BISHOP; ROOK; QUEEN; KING; NONE
+        {15, 14, 13, 12, 11, 10, 0}, // victim = PAWN
+        {25, 24, 23, 22, 21, 20, 0}, // victim = KNIGHT
+        {35, 34, 33, 32, 31, 30, 0}, // victim = BISHOP
+        {45, 44, 43, 42, 41, 40, 0}, // victim = ROOK
+        {55, 54, 53, 52, 51, 50, 0}, // victim = QUEEN
+        {0, 0, 0, 0, 0, 0, 0},       // victim = KING
+        {1, 2, 3, 4, 5, 0, 0}        // victim = NONE
+    };
+
     // move = atkmap + enemyorempty + checkmask + pins
     map EnPassantTarget = {}; // Where the current EP Target is. Only valid if the movestatus contains EP flag.
 
@@ -710,6 +723,7 @@ namespace Movelist
         map checkmask = Movestack::Check_Status[depth];
         map kingban = Movestack::Atk_King[depth - 1] = Movestack::Atk_EKing[depth];
         map kingatk = Refresh<status, depth>(brd, kingban, checkmask);
+        int treshold = -1;
 
         if (checkmask != 0)
         {
@@ -724,7 +738,7 @@ namespace Movelist
         }
         else
         {
-
+            // std::cout << "WPADA" << std::endl;
             if (status.WhiteMove)
             {
                 float value = std::numeric_limits<float>::lowest();
@@ -735,7 +749,7 @@ namespace Movelist
                     float eval = Callback_Move::template Kingmove<status, depth>(brd, King<status.WhiteMove>(brd), 1ull << sq, alpha, beta);
                     value = std::max(value, eval);
                     alpha = std::max(alpha, value);
-                    if (alpha >= beta and depth > 1)
+                    if (alpha >= beta and depth > treshold)
                     {
                         // Beta cutoff
                         return value;
@@ -748,11 +762,11 @@ namespace Movelist
                     return -1.1;
                 }
 
-                if (depth == 1)
-                {
-                    value = Callback_Move::template runBatch<status>();
-                    return value;
-                }
+                // if (depth == 1)
+                // {
+                //     value = Callback_Move::template runBatch<status>();
+                //     return value;
+                // }
                 return value;
             }
             else
@@ -765,9 +779,10 @@ namespace Movelist
                     float eval = Callback_Move::template Kingmove<status, depth>(brd, King<status.WhiteMove>(brd), 1ull << sq, alpha, beta);
                     value = std::min(value, eval);
                     beta = std::min(beta, value);
-                    if (beta <= alpha and depth > 1)
+                    if (beta <= alpha and depth > treshold)
                     {
                         // Alpha cutoff
+                        // std::cout << "cutoff A" << std::endl;
                         return value;
                     }
                 }
@@ -778,11 +793,11 @@ namespace Movelist
                     return 1.1;
                 }
 
-                if (depth == 1)
-                {
-                    value = Callback_Move::template runBatch<status>();
-                    return value;
-                }
+                // if (depth == 1)
+                // {
+                //     value = Callback_Move::template runBatch<status>();
+                //     return value;
+                // }
                 return value;
             }
             // SORT EVALUATION ASCENDING OR DESCENDING, DEPENDS ON STATUS AND RETURN ONE
@@ -803,6 +818,59 @@ namespace Movelist
             return Bitcount(kingatk); // double check
     }
 
+    struct MoveOrderingList
+    {
+        uint64_t from;
+        uint64_t to;
+        uint64_t enemy;
+        PieceType pieceType;
+        MoveType moveType;
+        int score;
+    };
+
+    PieceType getVictimPiece(const Board &brd, uint64_t toSquare)
+    {
+        // Each bitboard has bits set for squares containing that piece.
+        // Check if the square in 'toSquare' overlaps with each board.
+        if (brd.BPawn & toSquare || brd.WPawn & toSquare)
+            return PAWN;
+        if (brd.BKnight & toSquare || brd.WKnight & toSquare)
+            return KNIGHT;
+        if (brd.BBishop & toSquare || brd.WBishop & toSquare)
+            return BISHOP;
+        if (brd.BRook & toSquare || brd.WRook & toSquare)
+            return ROOK;
+        if (brd.BQueen & toSquare || brd.WQueen & toSquare)
+            return QUEEN;
+        if (brd.BKing & toSquare || brd.WKing & toSquare)
+            return KING;
+        return NONE_PIECE;
+    }
+
+    int scoreMove(const Board &brd, PieceType attackerPiece, uint64_t toSquare)
+    {
+        PieceType victim = getVictimPiece(brd, toSquare);
+        // std::cout << "victim: " << victim << " attacker: " << attackerPiece << " score: " << static_cast<int>(MVV_LVA[victim][attackerPiece]) << std::endl;
+        return static_cast<int>(MVV_LVA[victim][attackerPiece]);
+    }
+
+    void addMoveOrderingEntry(const Board &brd, std::vector<MoveOrderingList> &moves, uint64_t fromSquare, uint64_t toSquare, uint64_t enemy, PieceType pieceType, MoveType moveType)
+    {
+        int score;
+        if(moveType == Pawnpromote)
+        {
+            score = 100;
+        }
+        else
+        {
+            score = scoreMove(brd, pieceType, toSquare);
+        }
+        // float score2 = static_cast<float>(rand()) / (static_cast<float>(RAND_MAX) / 2.0f) - 1.0f;//std::cout << "eval: " << eval << std::endl;
+        // score = int(score2 * 100);
+        MoveOrderingList newEntry{fromSquare, toSquare, enemy, pieceType, moveType, score};
+        moves.push_back(newEntry);
+    }
+
     template <class BoardStatus status, class Callback_Move, int depth>
     _ForceInline float _enumerate_max(const Board &brd, map kingatk, const map kingban, const map checkmask, float alpha, float beta)
     {
@@ -819,63 +887,16 @@ namespace Movelist
         std::vector<float> evaluations;
         float value = std::numeric_limits<float>::lowest();
         float eval;
+        int treshold = -1;
+        // int treshold = 99; // disable pruning
 
-        // USUNIAC I DODAC JAKO ARGUMENTY
-        // float alpha = -0.5;
-        // float beta = 0.9;
+        std::vector<MoveOrderingList> moveList;
 
-        // Kingmoves
-        {
-            Bitloop(kingatk)
-            {
-                const Square sq = SquareOf(kingatk);
-                Movestack::Atk_EKing[depth - 1] = Lookup::King(sq);
-                eval = Callback_Move::template Kingmove<status, depth>(brd, King<white>(brd), 1ull << sq, alpha, beta);
-                value = std::max(value, eval);
-                alpha = std::max(alpha, value);
-                if (alpha >= beta and depth > 1 and depth > 1)
-                {
-                    // Beta cutoff
-                    return value;
-                }
-            }
+        // std::cout << "W/B?: " << status.WhiteMove << std::endl;
+        // std::cout << "START ENUMERATE_MAX" << std::endl;
 
-            // Castling
-            // Todo think about how to remove the template if a rook is taken that would have been able to castle
-            if constexpr (status.CanCastleLeft())
-            {
-                if (noCheck && status.CanCastleLeft(kingban, brd.Occ, Rooks<white>(brd)))
-                {
 
-                    Movestack::Atk_EKing[depth - 1] = Lookup::King(SquareOf(King<white>(brd) << 2));
-                    eval = Callback_Move::template KingCastle<status, depth>(brd, (King<white>(brd) | King<white>(brd) << 2), status.Castle_RookswitchL(), alpha, beta);
-                    value = std::max(value, eval);
-                    alpha = std::max(alpha, value);
-                    if (alpha >= beta and depth > 1)
-                    {
-                        // Beta cutoff
-                        return value;
-                    }
-                }
-            }
-            if constexpr (status.CanCastleRight())
-            {
-                if (noCheck && status.CanCastleRight(kingban, brd.Occ, Rooks<white>(brd)))
-                {
-                    Movestack::Atk_EKing[depth - 1] = Lookup::King(SquareOf(King<white>(brd) >> 2));
-                    eval = Callback_Move::template KingCastle<status, depth>(brd, (King<white>(brd) | King<white>(brd) >> 2), status.Castle_RookswitchR(), alpha, beta);
-                    value = std::max(value, eval);
-                    alpha = std::max(alpha, value);
-                    if (alpha >= beta and depth > 1)
-                    {
-                        // Beta cutoff
-                        return value;
-                    }
-                }
-            }
-            Movestack::Atk_EKing[depth - 1] = Movestack::Atk_King[depth]; // Default king atk for recursion
-        }
-
+        Movestack::Atk_EKing[depth - 1] = Movestack::Atk_King[depth]; // Default king atk for recursion
         {
             // Horizontal pinned pawns cannot do anything https://lichess.org/editor?fen=3r4%2F8%2F3P4%2F8%2F3K1P1r%2F8%2F8%2F8+w+-+-+0+1
             // Pawns may seem to be able to enpassant/promote but can still be pinned and inside a checkmask
@@ -917,25 +938,29 @@ namespace Movelist
 
                     if (EPLpawn)
                     {
-                        eval = Callback_Move::template PawnEnpassantTake<status, depth>(brd, EPLpawn, EPLpawn << 1, Pawn_AttackLeft<white>(EPLpawn), alpha, beta);
-                        value = std::max(value, eval);
-                        alpha = std::max(alpha, value);
-                        if (alpha >= beta and depth > 1)
-                        {
-                            // Beta cutoff
-                            return value;
-                        }
+                        addMoveOrderingEntry(brd, moveList, EPLpawn, Pawn_AttackLeft<white>(EPLpawn), EPLpawn << 1, PAWN, PawnEnpassantTake);
+                        // eval = Callback_Move::template PawnEnpassantTake<status, depth>(brd, EPLpawn, EPLpawn << 1, Pawn_AttackLeft<white>(EPLpawn), alpha, beta);
+                        // value = std::max(value, eval);
+                        // alpha = std::max(alpha, value);
+                        // if (alpha >= beta and depth > treshold)
+                        // {
+                        //     // Beta cutoff
+                        //     // std::cout << "cutoff B" << std::endl;
+                        //     return value;
+                        // }
                     }
                     if (EPRpawn)
                     {
-                        eval = Callback_Move::template PawnEnpassantTake<status, depth>(brd, EPRpawn, EPRpawn >> 1, Pawn_AttackRight<white>(EPRpawn), alpha, beta);
-                        value = std::max(value, eval);
-                        alpha = std::max(alpha, value);
-                        if (alpha >= beta and depth > 1)
-                        {
-                            // Beta cutoff
-                            return value;
-                        }
+                        addMoveOrderingEntry(brd, moveList, EPRpawn, Pawn_AttackRight<white>(EPRpawn), EPRpawn >> 1, PAWN, PawnEnpassantTake);
+                        // eval = Callback_Move::template PawnEnpassantTake<status, depth>(brd, EPRpawn, EPRpawn >> 1, Pawn_AttackRight<white>(EPRpawn), alpha, beta);
+                        // value = std::max(value, eval);
+                        // alpha = std::max(alpha, value);
+                        // if (alpha >= beta and depth > treshold)
+                        // {
+                        //     // Beta cutoff
+                        //     // std::cout << "cutoff B" << std::endl;
+                        //     return value;
+                        // }
                     }
                 }
             }
@@ -954,86 +979,100 @@ namespace Movelist
                 while (Promote_Left)
                 {
                     const Bit pos = PopBit(Promote_Left);
-                    eval = Callback_Move::template Pawnpromote<status, depth>(brd, pos, Pawn_AttackLeft<white>(pos), alpha, beta);
-                    value = std::max(value, eval);
-                    alpha = std::max(alpha, value);
-                    if (alpha >= beta and depth > 1)
-                    {
-                        // Beta cutoff
-                        return value;
-                    }
+                    addMoveOrderingEntry(brd, moveList, pos, Pawn_AttackLeft<white>(pos), 0, PAWN, Pawnpromote);
+                    // eval = Callback_Move::template Pawnpromote<status, depth>(brd, pos, Pawn_AttackLeft<white>(pos), alpha, beta);
+                    // value = std::max(value, eval);
+                    // alpha = std::max(alpha, value);
+                    // if (alpha >= beta and depth > treshold)
+                    // {
+                    //     // Beta cutoff
+                    //     // std::cout << "cutoff B" << std::endl;
+                    //     return value;
+                    // }
                 }
                 while (Promote_Right)
                 {
                     const Bit pos = PopBit(Promote_Right);
-                    eval = Callback_Move::template Pawnpromote<status, depth>(brd, pos, Pawn_AttackRight<white>(pos), alpha, beta);
-                    value = std::max(value, eval);
-                    alpha = std::max(alpha, value);
-                    if (alpha >= beta and depth > 1)
-                    {
-                        // Beta cutoff
-                        return value;
-                    }
+                    addMoveOrderingEntry(brd, moveList, pos, Pawn_AttackRight<white>(pos), 0, PAWN, Pawnpromote);
+                    // eval = Callback_Move::template Pawnpromote<status, depth>(brd, pos, Pawn_AttackRight<white>(pos), alpha, beta);
+                    // value = std::max(value, eval);
+                    // alpha = std::max(alpha, value);
+                    // if (alpha >= beta and depth > treshold)
+                    // {
+                    //     // Beta cutoff
+                    //     // std::cout << "cutoff B" << std::endl;
+                    //     return value;
+                    // }
                 }
                 while (Promote_Move)
                 {
                     const Bit pos = PopBit(Promote_Move);
-                    eval = Callback_Move::template Pawnpromote<status, depth>(brd, pos, Pawn_Forward<white>(pos), alpha, beta);
-                    value = std::max(value, eval);
-                    alpha = std::max(alpha, value);
-                    if (alpha >= beta and depth > 1)
-                    {
-                        // Beta cutoff
-                        return value;
-                    }
+                    addMoveOrderingEntry(brd, moveList, pos, Pawn_Forward<white>(pos), 0, PAWN, Pawnpromote);
+                    // eval = Callback_Move::template Pawnpromote<status, depth>(brd, pos, Pawn_Forward<white>(pos), alpha, beta);
+                    // value = std::max(value, eval);
+                    // alpha = std::max(alpha, value);
+                    // if (alpha >= beta and depth > treshold)
+                    // {
+                    //     // Beta cutoff
+                    //     // std::cout << "cutoff B" << std::endl;
+                    //     return value;
+                    // }
                 }
                 while (NoPromote_Left)
                 {
                     const Bit pos = PopBit(NoPromote_Left);
-                    eval = Callback_Move::template Pawnatk<status, depth>(brd, pos, Pawn_AttackLeft<white>(pos), alpha, beta);
-                    value = std::max(value, eval);
-                    alpha = std::max(alpha, value);
-                    if (alpha >= beta and depth > 1)
-                    {
-                        // Beta cutoff
-                        return value;
-                    }
+                    addMoveOrderingEntry(brd, moveList, pos, Pawn_AttackLeft<white>(pos), 0, PAWN, Pawnatk);
+                    // eval = Callback_Move::template Pawnatk<status, depth>(brd, pos, Pawn_AttackLeft<white>(pos), alpha, beta);
+                    // value = std::max(value, eval);
+                    // alpha = std::max(alpha, value);
+                    // if (alpha >= beta and depth > treshold)
+                    // {
+                    //     // Beta cutoff
+                    //     // std::cout << "cutoff B" << std::endl;
+                    //     return value;
+                    // }
                 }
                 while (NoPromote_Right)
                 {
                     const Bit pos = PopBit(NoPromote_Right);
-                    eval = Callback_Move::template Pawnatk<status, depth>(brd, pos, Pawn_AttackRight<white>(pos), alpha, beta);
-                    value = std::max(value, eval);
-                    alpha = std::max(alpha, value);
-                    if (alpha >= beta and depth > 1)
-                    {
-                        // Beta cutoff
-                        return value;
-                    }
+                    addMoveOrderingEntry(brd, moveList, pos, Pawn_AttackRight<white>(pos), 0, PAWN, Pawnatk);
+                    // eval = Callback_Move::template Pawnatk<status, depth>(brd, pos, Pawn_AttackRight<white>(pos), alpha, beta);
+                    // value = std::max(value, eval);
+                    // alpha = std::max(alpha, value);
+                    // if (alpha >= beta and depth > treshold)
+                    // {
+                    //     // Beta cutoff
+                    //     // std::cout << "cutoff B" << std::endl;
+                    //     return value;
+                    // }
                 }
                 while (NoPromote_Move)
                 {
                     const Bit pos = PopBit(NoPromote_Move);
-                    eval = Callback_Move::template Pawnmove<status, depth>(brd, pos, Pawn_Forward<white>(pos), alpha, beta);
-                    value = std::max(value, eval);
-                    alpha = std::max(alpha, value);
-                    if (alpha >= beta and depth > 1)
-                    {
-                        // Beta cutoff
-                        return value;
-                    }
+                    addMoveOrderingEntry(brd, moveList, pos, Pawn_Forward<white>(pos), 0, PAWN, Pawnmove);
+                    // eval = Callback_Move::template Pawnmove<status, depth>(brd, pos, Pawn_Forward<white>(pos), alpha, beta);
+                    // value = std::max(value, eval);
+                    // alpha = std::max(alpha, value);
+                    // if (alpha >= beta and depth > treshold)
+                    // {
+                    //     // Beta cutoff
+                    //     // std::cout << "cutoff B" << std::endl;
+                    //     return value;
+                    // }
                 }
                 while (Ppawns)
                 {
                     const Bit pos = PopBit(Ppawns);
-                    eval = Callback_Move::template Pawnpush<status, depth>(brd, pos, Pawn_Forward2<white>(pos), alpha, beta);
-                    value = std::max(value, eval);
-                    alpha = std::max(alpha, value);
-                    if (alpha >= beta and depth > 1)
-                    {
-                        // Beta cutoff
-                        return value;
-                    }
+                    addMoveOrderingEntry(brd, moveList, pos, Pawn_Forward2<white>(pos), 0, PAWN, Pawnpush);
+                    // eval = Callback_Move::template Pawnpush<status, depth>(brd, pos, Pawn_Forward2<white>(pos), alpha, beta);
+                    // value = std::max(value, eval);
+                    // alpha = std::max(alpha, value);
+                    // if (alpha >= beta and depth > treshold)
+                    // {
+                    //     // Beta cutoff
+                    //     // std::cout << "cutoff B" << std::endl;
+                    //     return value;
+                    // }
                 }
             }
             else
@@ -1041,50 +1080,58 @@ namespace Movelist
                 while (Lpawns)
                 {
                     const Bit pos = PopBit(Lpawns);
-                    eval = Callback_Move::template Pawnatk<status, depth>(brd, pos, Pawn_AttackLeft<white>(pos), alpha, beta);
-                    value = std::max(value, eval);
-                    alpha = std::max(alpha, value);
-                    if (alpha >= beta and depth > 1)
-                    {
-                        // Beta cutoff
-                        return value;
-                    }
+                    addMoveOrderingEntry(brd, moveList, pos, Pawn_AttackLeft<white>(pos), 0, PAWN, Pawnatk);
+                    // eval = Callback_Move::template Pawnatk<status, depth>(brd, pos, Pawn_AttackLeft<white>(pos), alpha, beta);
+                    // value = std::max(value, eval);
+                    // alpha = std::max(alpha, value);
+                    // if (alpha >= beta and depth > treshold)
+                    // {
+                    //     // Beta cutoff
+                    //     // std::cout << "cutoff B" << std::endl;
+                    //     return value;
+                    // }
                 }
                 while (Rpawns)
                 {
                     const Bit pos = PopBit(Rpawns);
-                    eval = Callback_Move::template Pawnatk<status, depth>(brd, pos, Pawn_AttackRight<white>(pos), alpha, beta);
-                    value = std::max(value, eval);
-                    alpha = std::max(alpha, value);
-                    if (alpha >= beta and depth > 1)
-                    {
-                        // Beta cutoff
-                        return value;
-                    }
+                    addMoveOrderingEntry(brd, moveList, pos, Pawn_AttackRight<white>(pos), 0, PAWN, Pawnatk);
+                    // eval = Callback_Move::template Pawnatk<status, depth>(brd, pos, Pawn_AttackRight<white>(pos), alpha, beta);
+                    // value = std::max(value, eval);
+                    // alpha = std::max(alpha, value);
+                    // if (alpha >= beta and depth > treshold)
+                    // {
+                    //     // Beta cutoff
+                    //     // std::cout << "cutoff B" << std::endl;
+                    //     return value;
+                    // }
                 }
                 while (Fpawns)
                 {
                     const Bit pos = PopBit(Fpawns);
-                    eval = Callback_Move::template Pawnmove<status, depth>(brd, pos, Pawn_Forward<white>(pos), alpha, beta);
-                    value = std::max(value, eval);
-                    alpha = std::max(alpha, value);
-                    if (alpha >= beta and depth > 1)
-                    {
-                        // Beta cutoff
-                        return value;
-                    }
+                    addMoveOrderingEntry(brd, moveList, pos, Pawn_Forward<white>(pos), 0, PAWN, Pawnmove);
+                    // eval = Callback_Move::template Pawnmove<status, depth>(brd, pos, Pawn_Forward<white>(pos), alpha, beta);
+                    // value = std::max(value, eval);
+                    // alpha = std::max(alpha, value);
+                    // if (alpha >= beta and depth > treshold)
+                    // {
+                    //     // Beta cutoff
+                    //     // std::cout << "cutoff B" << std::endl;
+                    //     return value;
+                    // }
                 }
                 while (Ppawns)
                 {
                     const Bit pos = PopBit(Ppawns);
-                    eval = Callback_Move::template Pawnpush<status, depth>(brd, pos, Pawn_Forward2<white>(pos), alpha, beta);
-                    value = std::max(value, eval);
-                    alpha = std::max(alpha, value);
-                    if (alpha >= beta and depth > 1)
-                    {
-                        // Beta cutoff
-                        return value;
-                    }
+                    addMoveOrderingEntry(brd, moveList, pos, Pawn_Forward2<white>(pos), 0, PAWN, Pawnpush);
+                    // eval = Callback_Move::template Pawnpush<status, depth>(brd, pos, Pawn_Forward2<white>(pos), alpha, beta);
+                    // value = std::max(value, eval);
+                    // alpha = std::max(alpha, value);
+                    // if (alpha >= beta and depth > treshold)
+                    // {
+                    //     // Beta cutoff
+                    //     // std::cout << "cutoff B" << std::endl;
+                    //     return value;
+                    // }
                 }
             }
         }
@@ -1100,14 +1147,16 @@ namespace Movelist
                 while (move)
                 {
                     const Bit to = PopBit(move);
-                    eval = Callback_Move::template Knightmove<status, depth>(brd, 1ull << sq, to, alpha, beta);
-                    value = std::max(value, eval);
-                    alpha = std::max(alpha, value);
-                    if (alpha >= beta and depth > 1)
-                    {
-                        // Beta cutoff
-                        return value;
-                    }
+                    addMoveOrderingEntry(brd, moveList, 1ull << sq, to, 0, KNIGHT, Knightmove);
+                    // eval = Callback_Move::template Knightmove<status, depth>(brd, 1ull << sq, to, alpha, beta);
+                    // value = std::max(value, eval);
+                    // alpha = std::max(alpha, value);
+                    // if (alpha >= beta and depth > treshold)
+                    // {
+                    //     // Beta cutoff
+                    //     // std::cout << "cutoff B" << std::endl;
+                    //     return value;
+                    // }
                 }
             }
         }
@@ -1133,14 +1182,16 @@ namespace Movelist
                     while (move)
                     {
                         const Bit to = PopBit(move);
-                        eval = Callback_Move::template Queenmove<status, depth>(brd, pos, to, alpha, beta);
-                        value = std::max(value, eval);
-                        alpha = std::max(alpha, value);
-                        if (alpha >= beta and depth > 1)
-                        {
-                            // Beta cutoff
-                            return value;
-                        }
+                        addMoveOrderingEntry(brd, moveList, pos, to, 0, QUEEN, Queenmove);
+                        // eval = Callback_Move::template Queenmove<status, depth>(brd, pos, to, alpha, beta);
+                        // value = std::max(value, eval);
+                        // alpha = std::max(alpha, value);
+                        // if (alpha >= beta and depth > treshold)
+                        // {
+                        //     // Beta cutoff
+                        //     // std::cout << "cutoff B" << std::endl;
+                        //     return value;
+                        // }
                     }
                 }
                 else
@@ -1148,14 +1199,16 @@ namespace Movelist
                     while (move)
                     {
                         const Bit to = PopBit(move);
-                        eval = Callback_Move::template Bishopmove<status, depth>(brd, pos, to, alpha, beta);
-                        value = std::max(value, eval);
-                        alpha = std::max(alpha, value);
-                        if (alpha >= beta and depth > 1)
-                        {
-                            // Beta cutoff
-                            return value;
-                        }
+                        addMoveOrderingEntry(brd, moveList, pos, to, 0, BISHOP, Bishopmove);
+                        // eval = Callback_Move::template Bishopmove<status, depth>(brd, pos, to, alpha, beta);
+                        // value = std::max(value, eval);
+                        // alpha = std::max(alpha, value);
+                        // if (alpha >= beta and depth > treshold)
+                        // {
+                        //     // Beta cutoff
+                        //     // std::cout << "cutoff B" << std::endl;
+                        //     return value;
+                        // }
                     }
                 }
             }
@@ -1167,14 +1220,16 @@ namespace Movelist
                 while (move)
                 {
                     const Bit to = PopBit(move);
-                    eval = Callback_Move::template Bishopmove<status, depth>(brd, 1ull << sq, to, alpha, beta);
-                    value = std::max(value, eval);
-                    alpha = std::max(alpha, value);
-                    if (alpha >= beta and depth > 1)
-                    {
-                        // Beta cutoff
-                        return value;
-                    }
+                    addMoveOrderingEntry(brd, moveList, 1ull << sq, to, 0, BISHOP, Bishopmove);
+                    // eval = Callback_Move::template Bishopmove<status, depth>(brd, 1ull << sq, to, alpha, beta);
+                    // value = std::max(value, eval);
+                    // alpha = std::max(alpha, value);
+                    // if (alpha >= beta and depth > treshold)
+                    // {
+                    //     // Beta cutoff
+                    //     // std::cout << "cutoff B" << std::endl;
+                    //     return value;
+                    // }
                 }
             }
         }
@@ -1196,14 +1251,16 @@ namespace Movelist
                     while (move)
                     {
                         const Bit to = PopBit(move);
-                        eval = Callback_Move::template Queenmove<status, depth>(brd, pos, to, alpha, beta);
-                        value = std::max(value, eval);
-                        alpha = std::max(alpha, value);
-                        if (alpha >= beta and depth > 1)
-                        {
-                            // Beta cutoff
-                            return value;
-                        }
+                        addMoveOrderingEntry(brd, moveList, pos, to, 0, QUEEN, Queenmove);
+                        // eval = Callback_Move::template Queenmove<status, depth>(brd, pos, to, alpha, beta);
+                        // value = std::max(value, eval);
+                        // alpha = std::max(alpha, value);
+                        // if (alpha >= beta and depth > treshold)
+                        // {
+                        //     // Beta cutoff
+                        //     // std::cout << "cutoff B" << std::endl;
+                        //     return value;
+                        // }
                     }
                 }
                 else
@@ -1211,14 +1268,16 @@ namespace Movelist
                     while (move)
                     {
                         const Bit to = PopBit(move);
-                        eval = Callback_Move::template Rookmove<status, depth>(brd, pos, to, alpha, beta);
-                        value = std::max(value, eval);
-                        alpha = std::max(alpha, value);
-                        if (alpha >= beta and depth > 1)
-                        {
-                            // Beta cutoff
-                            return value;
-                        }
+                        addMoveOrderingEntry(brd, moveList, pos, to, 0, ROOK, Rookmove);
+                        // eval = Callback_Move::template Rookmove<status, depth>(brd, pos, to, alpha, beta);
+                        // value = std::max(value, eval);
+                        // alpha = std::max(alpha, value);
+                        // if (alpha >= beta and depth > treshold)
+                        // {
+                        //     // Beta cutoff
+                        //     // std::cout << "cutoff B" << std::endl;
+                        //     return value;
+                        // }
                     }
                 }
             }
@@ -1230,14 +1289,16 @@ namespace Movelist
                 while (move)
                 {
                     const Bit to = PopBit(move);
-                    eval = Callback_Move::template Rookmove<status, depth>(brd, 1ull << sq, to, alpha, beta);
-                    value = std::max(value, eval);
-                    alpha = std::max(alpha, value);
-                    if (alpha >= beta and depth > 1)
-                    {
-                        // Beta cutoff
-                        return value;
-                    }
+                    addMoveOrderingEntry(brd, moveList, 1ull << sq, to, 0, ROOK, Rookmove);
+                    // eval = Callback_Move::template Rookmove<status, depth>(brd, 1ull << sq, to, alpha, beta);
+                    // value = std::max(value, eval);
+                    // alpha = std::max(alpha, value);
+                    // if (alpha >= beta and depth > treshold)
+                    // {
+                    //     // Beta cutoff
+                    //     // std::cout << "cutoff B" << std::endl;
+                    //     return value;
+                    // }
                 }
             }
         }
@@ -1254,21 +1315,149 @@ namespace Movelist
                 while (move)
                 {
                     const Bit to = PopBit(move);
-                    eval = Callback_Move::template Queenmove<status, depth>(brd, 1ull << sq, to, alpha, beta);
-                    value = std::max(value, eval);
-                    alpha = std::max(alpha, value);
-                    if (alpha >= beta and depth > 1)
-                    {
-                        // Beta cutoff
-                        return value;
-                    }
+                    addMoveOrderingEntry(brd, moveList, 1ull << sq, to, 0, QUEEN, Queenmove);
+                    // eval = Callback_Move::template Queenmove<status, depth>(brd, 1ull << sq, to, alpha, beta);
+                    // value = std::max(value, eval);
+                    // alpha = std::max(alpha, value);
+                    // if (alpha >= beta and depth > treshold)
+                    // {
+                    //     // Beta cutoff
+                    //     // std::cout << "cutoff B" << std::endl;
+                    //     return value;
+                    // }
                 }
             }
         }
 
-        if (noCheck and value > 1)
+        // Order moves from best to worst
+        std::sort(moveList.begin(), moveList.end(),
+                  [](const MoveOrderingList &a, const MoveOrderingList &b)
+                  {
+                      return a.score > b.score;
+                  });
+
+        // std::cout << "START LIST:" << std::endl;
+        // std::size_t j = 0;
+        // while (j < moveList.size())
+        // {
+        //     std::cout << "Move TYPE " << moveList[j].moveType << " score: " << moveList[j].score << std::endl;
+        //     j++;
+        // }
+
+        // std::cout << "END ENUMERATE_MAX, GO DEEPER" << std::endl;
+        for (std::size_t i = 0; i < moveList.size(); i++)
         {
-            std::cout << "Stalemate detected 8638946392846389" << std::endl;
+            const auto &move = moveList[i];
+
+            // Switch on the moveType
+            switch (move.moveType)
+            {
+            case Kingmove:
+                eval = Callback_Move::template Kingmove<status, depth>(brd, move.from, move.to, alpha, beta);
+                break;
+            case KingCastle:
+                eval = Callback_Move::template KingCastle<status, depth>(brd, move.from, move.to, alpha, beta);
+                break;
+            case Pawnmove:
+                eval = Callback_Move::template Pawnmove<status, depth>(brd, move.from, move.to, alpha, beta);
+                break;
+            case Pawnatk:
+                eval = Callback_Move::template Pawnatk<status, depth>(brd, move.from, move.to, alpha, beta);
+                break;
+            case PawnEnpassantTake:
+                eval = Callback_Move::template PawnEnpassantTake<status, depth>(brd, move.from, move.enemy, move.to, alpha, beta);
+                break;
+            case Pawnpush:
+                eval = Callback_Move::template Pawnpush<status, depth>(brd, move.from, move.to, alpha, beta);
+                break;
+            case Pawnpromote:
+                eval = Callback_Move::template Pawnpromote<status, depth>(brd, move.from, move.to, alpha, beta);
+                break;
+            case Knightmove:
+                eval = Callback_Move::template Knightmove<status, depth>(brd, move.from, move.to, alpha, beta);
+                break;
+            case Bishopmove:
+                eval = Callback_Move::template Bishopmove<status, depth>(brd, move.from, move.to, alpha, beta);
+                break;
+            case Rookmove:
+                eval = Callback_Move::template Rookmove<status, depth>(brd, move.from, move.to, alpha, beta);
+                break;
+            case Queenmove:
+                eval = Callback_Move::template Queenmove<status, depth>(brd, move.from, move.to, alpha, beta);
+                break;
+            default:
+                std::cout << "ERROR " << i << " has an unrecognized moveType: " << static_cast<int>(move.moveType) << "\n";
+                break;
+            }
+            value = std::max(value, eval);
+            alpha = std::max(alpha, value);
+            if (alpha >= beta and depth > treshold)
+            {
+                // Beta cutoff
+                // std::cout << "cutoff B" << std::endl;
+                return value;
+            }
+        }
+
+        // Kingmoves
+        {
+            Bitloop(kingatk)
+            {
+                const Square sq = SquareOf(kingatk);
+                Movestack::Atk_EKing[depth - 1] = Lookup::King(sq);
+                // addMoveOrderingEntry(brd, moveList, King<white>(brd), 1ull << sq, 0, KING, Kingmove);
+                eval = Callback_Move::template Kingmove<status, depth>(brd, King<white>(brd), 1ull << sq, alpha, beta);
+                value = std::max(value, eval);
+                alpha = std::max(alpha, value);
+                if (alpha >= beta and depth > treshold)
+                {
+                    // Beta cutoff
+                    return value;
+                }
+            }
+
+            // Castling
+            // Todo think about how to remove the template if a rook is taken that would have been able to castle
+            if constexpr (status.CanCastleLeft())
+            {
+                if (noCheck && status.CanCastleLeft(kingban, brd.Occ, Rooks<white>(brd)))
+                {
+
+                    Movestack::Atk_EKing[depth - 1] = Lookup::King(SquareOf(King<white>(brd) << 2));
+                    eval = Callback_Move::template KingCastle<status, depth>(brd, (King<white>(brd) | King<white>(brd) << 2), status.Castle_RookswitchL(), alpha, beta);
+                    value = std::max(value, eval);
+                    alpha = std::max(alpha, value);
+                    if (alpha >= beta and depth > treshold)
+                    {
+                        // Beta cutoff
+                        // std::cout << "cutoff B" << std::endl;
+                        return value;
+                    }
+                }
+            }
+            if constexpr (status.CanCastleRight())
+            {
+                if (noCheck && status.CanCastleRight(kingban, brd.Occ, Rooks<white>(brd)))
+                {
+                    Movestack::Atk_EKing[depth - 1] = Lookup::King(SquareOf(King<white>(brd) >> 2));
+                    eval = Callback_Move::template KingCastle<status, depth>(brd, (King<white>(brd) | King<white>(brd) >> 2), status.Castle_RookswitchR(), alpha, beta);
+                    value = std::max(value, eval);
+                    alpha = std::max(alpha, value);
+                    if (alpha >= beta and depth > treshold)
+                    {
+                        // Beta cutoff
+                        // std::cout << "cutoff B" << std::endl;
+                        return value;
+                    }
+                }
+            }
+            Movestack::Atk_EKing[depth - 1] = Movestack::Atk_King[depth]; // Default king atk for recursion
+        }
+
+        // if (noCheck and value > 1)
+        if (noCheck and value == std::numeric_limits<float>::lowest())
+        {
+            // std::cout << "Stalemate detected 8638946392846389" << std::endl;
             return 0;
         }
         if (value < -1)
@@ -1277,11 +1466,11 @@ namespace Movelist
             return -1.1;
         }
 
-        if (depth == 1)
-        {
-            value = Callback_Move::template runBatch<status>();
-            return value;
-        }
+        // if (depth == 1)
+        // {
+        //     value = Callback_Move::template runBatch<status>();
+        //     return value;
+        // }
         // std::cerr << "Tu nie powinno wpaść 1 " << std::endl;
         // std::cout << "depth: "<< depth << " value: " << value << " alpha: " << alpha << " beta: " << beta << std::endl;
         return value;
@@ -1303,62 +1492,14 @@ namespace Movelist
         std::vector<float> evaluations;
         float value = std::numeric_limits<float>::max();
         float eval;
+        int treshold = -1;
+        // int treshold = 99; // disable pruning
 
-        // USUNIAC I DODAC JAKO ARGUMENTY
-        // float alpha = -0.5;
-        // float beta = 0.9;
+        std::vector<MoveOrderingList> moveList;
 
-        // Kingmoves
-        {
-            Bitloop(kingatk)
-            {
-                const Square sq = SquareOf(kingatk);
-                Movestack::Atk_EKing[depth - 1] = Lookup::King(sq);
-                eval = Callback_Move::template Kingmove<status, depth>(brd, King<white>(brd), 1ull << sq, alpha, beta);
-                value = std::min(value, eval);
-                beta = std::min(beta, value);
-                if (beta <= alpha and depth > 1)
-                {
-                    // Alpha cutoff
-                    return value;
-                }
-            }
+        // std::cout << "W/B?: " << status.WhiteMove << std::endl;
 
-            // Castling
-            // Todo think about how to remove the template if a rook is taken that would have been able to castle
-            if constexpr (status.CanCastleLeft())
-            {
-                if (noCheck && status.CanCastleLeft(kingban, brd.Occ, Rooks<white>(brd)))
-                {
-                    Movestack::Atk_EKing[depth - 1] = Lookup::King(SquareOf(King<white>(brd) << 2));
-                    eval = Callback_Move::template KingCastle<status, depth>(brd, (King<white>(brd) | King<white>(brd) << 2), status.Castle_RookswitchL(), alpha, beta);
-                    value = std::min(value, eval);
-                    beta = std::min(beta, value);
-                    if (beta <= alpha and depth > 1)
-                    {
-                        // Alpha cutoff
-                        return value;
-                    }
-                }
-            }
-            if constexpr (status.CanCastleRight())
-            {
-                if (noCheck && status.CanCastleRight(kingban, brd.Occ, Rooks<white>(brd)))
-                {
-                    Movestack::Atk_EKing[depth - 1] = Lookup::King(SquareOf(King<white>(brd) >> 2));
-                    eval = Callback_Move::template KingCastle<status, depth>(brd, (King<white>(brd) | King<white>(brd) >> 2), status.Castle_RookswitchR(), alpha, beta);
-                    value = std::min(value, eval);
-                    beta = std::min(beta, value);
-                    if (beta <= alpha and depth > 1)
-                    {
-                        // Alpha cutoff
-                        return value;
-                    }
-                }
-            }
-            Movestack::Atk_EKing[depth - 1] = Movestack::Atk_King[depth]; // Default king atk for recursion
-        }
-
+        Movestack::Atk_EKing[depth - 1] = Movestack::Atk_King[depth]; // Default king atk for recursion
         {
             // Horizontal pinned pawns cannot do anything https://lichess.org/editor?fen=3r4%2F8%2F3P4%2F8%2F3K1P1r%2F8%2F8%2F8+w+-+-+0+1
             // Pawns may seem to be able to enpassant/promote but can still be pinned and inside a checkmask
@@ -1400,25 +1541,29 @@ namespace Movelist
 
                     if (EPLpawn)
                     {
-                        eval = Callback_Move::template PawnEnpassantTake<status, depth>(brd, EPLpawn, EPLpawn << 1, Pawn_AttackLeft<white>(EPLpawn), alpha, beta);
-                        value = std::min(value, eval);
-                        beta = std::min(beta, value);
-                        if (beta <= alpha and depth > 1)
-                        {
-                            // Alpha cutoff
-                            return value;
-                        }
+                        addMoveOrderingEntry(brd, moveList, EPLpawn, Pawn_AttackLeft<white>(EPLpawn), EPLpawn << 1, PAWN, PawnEnpassantTake);
+                        // eval = Callback_Move::template PawnEnpassantTake<status, depth>(brd, EPLpawn, EPLpawn << 1, Pawn_AttackLeft<white>(EPLpawn), alpha, beta);
+                        // value = std::min(value, eval);
+                        // beta = std::min(beta, value);
+                        // if (beta <= alpha and depth > treshold)
+                        // {
+                        //     // Alpha cutoff
+                        //     // std::cout << "cutoff A" << std::endl;
+                        //     return value;
+                        // }
                     }
                     if (EPRpawn)
                     {
-                        eval = Callback_Move::template PawnEnpassantTake<status, depth>(brd, EPRpawn, EPRpawn >> 1, Pawn_AttackRight<white>(EPRpawn), alpha, beta);
-                        value = std::min(value, eval);
-                        beta = std::min(beta, value);
-                        if (beta <= alpha and depth > 1)
-                        {
-                            // Alpha cutoff
-                            return value;
-                        }
+                        addMoveOrderingEntry(brd, moveList, EPRpawn, Pawn_AttackRight<white>(EPRpawn), EPRpawn >> 1, PAWN, PawnEnpassantTake);
+                        // eval = Callback_Move::template PawnEnpassantTake<status, depth>(brd, EPRpawn, EPRpawn >> 1, Pawn_AttackRight<white>(EPRpawn), alpha, beta);
+                        // value = std::min(value, eval);
+                        // beta = std::min(beta, value);
+                        // if (beta <= alpha and depth > treshold)
+                        // {
+                        //     // Alpha cutoff
+                        //     // std::cout << "cutoff A" << std::endl;
+                        //     return value;
+                        // }
                     }
                 }
             }
@@ -1437,86 +1582,100 @@ namespace Movelist
                 while (Promote_Left)
                 {
                     const Bit pos = PopBit(Promote_Left);
-                    eval = Callback_Move::template Pawnpromote<status, depth>(brd, pos, Pawn_AttackLeft<white>(pos), alpha, beta);
-                    value = std::min(value, eval);
-                    beta = std::min(beta, value);
-                    if (beta <= alpha and depth > 1)
-                    {
-                        // Alpha cutoff
-                        return value;
-                    }
+                    addMoveOrderingEntry(brd, moveList, pos, Pawn_AttackLeft<white>(pos), 0, PAWN, Pawnpromote);
+                    // eval = Callback_Move::template Pawnpromote<status, depth>(brd, pos, Pawn_AttackLeft<white>(pos), alpha, beta);
+                    // value = std::min(value, eval);
+                    // beta = std::min(beta, value);
+                    // if (beta <= alpha and depth > treshold)
+                    // {
+                    //     // Alpha cutoff
+                    //     // std::cout << "cutoff A" << std::endl;
+                    //     return value;
+                    // }
                 }
                 while (Promote_Right)
                 {
                     const Bit pos = PopBit(Promote_Right);
-                    eval = Callback_Move::template Pawnpromote<status, depth>(brd, pos, Pawn_AttackRight<white>(pos), alpha, beta);
-                    value = std::min(value, eval);
-                    beta = std::min(beta, value);
-                    if (beta <= alpha and depth > 1)
-                    {
-                        // Alpha cutoff
-                        return value;
-                    }
+                    addMoveOrderingEntry(brd, moveList, pos, Pawn_AttackRight<white>(pos), 0, PAWN, Pawnpromote);
+                    // eval = Callback_Move::template Pawnpromote<status, depth>(brd, pos, Pawn_AttackRight<white>(pos), alpha, beta);
+                    // value = std::min(value, eval);
+                    // beta = std::min(beta, value);
+                    // if (beta <= alpha and depth > treshold)
+                    // {
+                    //     // Alpha cutoff
+                    //     // std::cout << "cutoff A" << std::endl;
+                    //     return value;
+                    // }
                 }
                 while (Promote_Move)
                 {
                     const Bit pos = PopBit(Promote_Move);
-                    eval = Callback_Move::template Pawnpromote<status, depth>(brd, pos, Pawn_Forward<white>(pos), alpha, beta);
-                    value = std::min(value, eval);
-                    beta = std::min(beta, value);
-                    if (beta <= alpha and depth > 1)
-                    {
-                        // Alpha cutoff
-                        return value;
-                    }
+                    addMoveOrderingEntry(brd, moveList, pos, Pawn_Forward<white>(pos), 0, PAWN, Pawnpromote);
+                    // eval = Callback_Move::template Pawnpromote<status, depth>(brd, pos, Pawn_Forward<white>(pos), alpha, beta);
+                    // value = std::min(value, eval);
+                    // beta = std::min(beta, value);
+                    // if (beta <= alpha and depth > treshold)
+                    // {
+                    //     // Alpha cutoff
+                    //     // std::cout << "cutoff A" << std::endl;
+                    //     return value;
+                    // }
                 }
                 while (NoPromote_Left)
                 {
                     const Bit pos = PopBit(NoPromote_Left);
-                    eval = Callback_Move::template Pawnatk<status, depth>(brd, pos, Pawn_AttackLeft<white>(pos), alpha, beta);
-                    value = std::min(value, eval);
-                    beta = std::min(beta, value);
-                    if (beta <= alpha and depth > 1)
-                    {
-                        // Alpha cutoff
-                        return value;
-                    }
+                    addMoveOrderingEntry(brd, moveList, pos, Pawn_AttackLeft<white>(pos), 0, PAWN, Pawnatk);
+                    // eval = Callback_Move::template Pawnatk<status, depth>(brd, pos, Pawn_AttackLeft<white>(pos), alpha, beta);
+                    // value = std::min(value, eval);
+                    // beta = std::min(beta, value);
+                    // if (beta <= alpha and depth > treshold)
+                    // {
+                    //     // Alpha cutoff
+                    //     // std::cout << "cutoff A" << std::endl;
+                    //     return value;
+                    // }
                 }
                 while (NoPromote_Right)
                 {
                     const Bit pos = PopBit(NoPromote_Right);
-                    eval = Callback_Move::template Pawnatk<status, depth>(brd, pos, Pawn_AttackRight<white>(pos), alpha, beta);
-                    value = std::min(value, eval);
-                    beta = std::min(beta, value);
-                    if (beta <= alpha and depth > 1)
-                    {
-                        // Alpha cutoff
-                        return value;
-                    }
+                    addMoveOrderingEntry(brd, moveList, pos, Pawn_AttackRight<white>(pos), 0, PAWN, Pawnatk);
+                    // eval = Callback_Move::template Pawnatk<status, depth>(brd, pos, Pawn_AttackRight<white>(pos), alpha, beta);
+                    // value = std::min(value, eval);
+                    // beta = std::min(beta, value);
+                    // if (beta <= alpha and depth > treshold)
+                    // {
+                    //     // Alpha cutoff
+                    //     // std::cout << "cutoff A" << std::endl;
+                    //     return value;
+                    // }
                 }
                 while (NoPromote_Move)
                 {
                     const Bit pos = PopBit(NoPromote_Move);
-                    eval = Callback_Move::template Pawnmove<status, depth>(brd, pos, Pawn_Forward<white>(pos), alpha, beta);
-                    value = std::min(value, eval);
-                    beta = std::min(beta, value);
-                    if (beta <= alpha and depth > 1)
-                    {
-                        // Alpha cutoff
-                        return value;
-                    }
+                    addMoveOrderingEntry(brd, moveList, pos, Pawn_Forward<white>(pos), 0, PAWN, Pawnmove);
+                    // eval = Callback_Move::template Pawnmove<status, depth>(brd, pos, Pawn_Forward<white>(pos), alpha, beta);
+                    // value = std::min(value, eval);
+                    // beta = std::min(beta, value);
+                    // if (beta <= alpha and depth > treshold)
+                    // {
+                    //     // Alpha cutoff
+                    //     // std::cout << "cutoff A" << std::endl;
+                    //     return value;
+                    // }
                 }
                 while (Ppawns)
                 {
                     const Bit pos = PopBit(Ppawns);
-                    eval = Callback_Move::template Pawnpush<status, depth>(brd, pos, Pawn_Forward2<white>(pos), alpha, beta);
-                    value = std::min(value, eval);
-                    beta = std::min(beta, value);
-                    if (beta <= alpha and depth > 1)
-                    {
-                        // Alpha cutoff
-                        return value;
-                    }
+                    addMoveOrderingEntry(brd, moveList, pos, Pawn_Forward2<white>(pos), 0, PAWN, Pawnpush);
+                    // eval = Callback_Move::template Pawnpush<status, depth>(brd, pos, Pawn_Forward2<white>(pos), alpha, beta);
+                    // value = std::min(value, eval);
+                    // beta = std::min(beta, value);
+                    // if (beta <= alpha and depth > treshold)
+                    // {
+                    //     // Alpha cutoff
+                    //     // std::cout << "cutoff A" << std::endl;
+                    //     return value;
+                    // }
                 }
             }
             else
@@ -1524,48 +1683,56 @@ namespace Movelist
                 while (Lpawns)
                 {
                     const Bit pos = PopBit(Lpawns);
-                    eval = Callback_Move::template Pawnatk<status, depth>(brd, pos, Pawn_AttackLeft<white>(pos), alpha, beta);
-                    value = std::min(value, eval);
-                    beta = std::min(beta, value);
-                    if (beta <= alpha and depth > 1)
-                    {
-                        // Alpha cutoff
-                        return value;
-                    }
+                    addMoveOrderingEntry(brd, moveList, pos, Pawn_AttackLeft<white>(pos), 0, PAWN, Pawnatk);
+                    // eval = Callback_Move::template Pawnatk<status, depth>(brd, pos, Pawn_AttackLeft<white>(pos), alpha, beta);
+                    // value = std::min(value, eval);
+                    // beta = std::min(beta, value);
+                    // if (beta <= alpha and depth > treshold)
+                    // {
+                    //     // Alpha cutoff
+                    //     // std::cout << "cutoff A" << std::endl;
+                    //     return value;
+                    // }
                 }
                 while (Rpawns)
                 {
                     const Bit pos = PopBit(Rpawns);
-                    eval = Callback_Move::template Pawnatk<status, depth>(brd, pos, Pawn_AttackRight<white>(pos), alpha, beta);
-                    value = std::min(value, eval);
-                    beta = std::min(beta, value);
-                    if (beta <= alpha and depth > 1)
-                    {
-                        // Alpha cutoff
-                        return value;
-                    }
+                    addMoveOrderingEntry(brd, moveList, pos, Pawn_AttackRight<white>(pos), 0, PAWN, Pawnatk);
+                    // eval = Callback_Move::template Pawnatk<status, depth>(brd, pos, Pawn_AttackRight<white>(pos), alpha, beta);
+                    // value = std::min(value, eval);
+                    // beta = std::min(beta, value);
+                    // if (beta <= alpha and depth > treshold)
+                    // {
+                    //     // Alpha cutoff
+                    //     // std::cout << "cutoff A" << std::endl;
+                    //     return value;
+                    // }
                 }
                 while (Fpawns)
                 {
                     const Bit pos = PopBit(Fpawns);
-                    eval = Callback_Move::template Pawnmove<status, depth>(brd, pos, Pawn_Forward<white>(pos), alpha, beta);
-                    value = std::min(value, eval);
-                    beta = std::min(beta, value);
-                    if (beta <= alpha and depth > 1)
-                    {
-                        // Alpha cutoff
-                        return value;
-                    }
+                    addMoveOrderingEntry(brd, moveList, pos, Pawn_Forward<white>(pos), 0, PAWN, Pawnmove);
+                    // eval = Callback_Move::template Pawnmove<status, depth>(brd, pos, Pawn_Forward<white>(pos), alpha, beta);
+                    // value = std::min(value, eval);
+                    // beta = std::min(beta, value);
+                    // if (beta <= alpha and depth > treshold)
+                    // {
+                    //     // Alpha cutoff
+                    //     // std::cout << "cutoff A" << std::endl;
+                    //     return value;
+                    // }
                 }
                 while (Ppawns)
                 {
                     const Bit pos = PopBit(Ppawns);
+                    // addMoveOrderingEntry(brd, moveList, pos, Pawn_Forward2<white>(pos), 0, PAWN, Pawnpush);
                     eval = Callback_Move::template Pawnpush<status, depth>(brd, pos, Pawn_Forward2<white>(pos), alpha, beta);
                     value = std::min(value, eval);
                     beta = std::min(beta, value);
-                    if (beta <= alpha and depth > 1)
+                    if (beta <= alpha and depth > treshold)
                     {
                         // Alpha cutoff
+                        // std::cout << "cutoff A" << std::endl;
                         return value;
                     }
                 }
@@ -1583,14 +1750,16 @@ namespace Movelist
                 while (move)
                 {
                     const Bit to = PopBit(move);
-                    eval = Callback_Move::template Knightmove<status, depth>(brd, 1ull << sq, to, alpha, beta);
-                    value = std::min(value, eval);
-                    beta = std::min(beta, value);
-                    if (beta <= alpha and depth > 1)
-                    {
-                        // Alpha cutoff
-                        return value;
-                    }
+                    addMoveOrderingEntry(brd, moveList, 1ull << sq, to, 0, KNIGHT, Knightmove);
+                    // eval = Callback_Move::template Knightmove<status, depth>(brd, 1ull << sq, to, alpha, beta);
+                    // value = std::min(value, eval);
+                    // beta = std::min(beta, value);
+                    // if (beta <= alpha and depth > treshold)
+                    // {
+                    //     // Alpha cutoff
+                    //     // std::cout << "cutoff A" << std::endl;
+                    //     return value;
+                    // }
                 }
             }
         }
@@ -1616,14 +1785,16 @@ namespace Movelist
                     while (move)
                     {
                         const Bit to = PopBit(move);
-                        eval = Callback_Move::template Queenmove<status, depth>(brd, pos, to, alpha, beta);
-                        value = std::min(value, eval);
-                        beta = std::min(beta, value);
-                        if (beta <= alpha and depth > 1)
-                        {
-                            // Alpha cutoff
-                            return value;
-                        }
+                        addMoveOrderingEntry(brd, moveList, pos, to, 0, QUEEN, Queenmove);
+                        // eval = Callback_Move::template Queenmove<status, depth>(brd, pos, to, alpha, beta);
+                        // value = std::min(value, eval);
+                        // beta = std::min(beta, value);
+                        // if (beta <= alpha and depth > treshold)
+                        // {
+                        //     // Alpha cutoff
+                        //     // std::cout << "cutoff A" << std::endl;
+                        //     return value;
+                        // }
                     }
                 }
                 else
@@ -1631,14 +1802,16 @@ namespace Movelist
                     while (move)
                     {
                         const Bit to = PopBit(move);
-                        eval = Callback_Move::template Bishopmove<status, depth>(brd, pos, to, alpha, beta);
-                        value = std::min(value, eval);
-                        beta = std::min(beta, value);
-                        if (beta <= alpha and depth > 1)
-                        {
-                            // Alpha cutoff
-                            return value;
-                        }
+                        addMoveOrderingEntry(brd, moveList, pos, to, 0, BISHOP, Bishopmove);
+                        // eval = Callback_Move::template Bishopmove<status, depth>(brd, pos, to, alpha, beta);
+                        // value = std::min(value, eval);
+                        // beta = std::min(beta, value);
+                        // if (beta <= alpha and depth > treshold)
+                        // {
+                        //     // Alpha cutoff
+                        //     // std::cout << "cutoff A" << std::endl;
+                        //     return value;
+                        // }
                     }
                 }
             }
@@ -1650,14 +1823,16 @@ namespace Movelist
                 while (move)
                 {
                     const Bit to = PopBit(move);
-                    eval = Callback_Move::template Bishopmove<status, depth>(brd, 1ull << sq, to, alpha, beta);
-                    value = std::min(value, eval);
-                    beta = std::min(beta, value);
-                    if (beta <= alpha and depth > 1)
-                    {
-                        // Alpha cutoff
-                        return value;
-                    }
+                    addMoveOrderingEntry(brd, moveList, 1ull << sq, to, 0, BISHOP, Bishopmove);
+                    // eval = Callback_Move::template Bishopmove<status, depth>(brd, 1ull << sq, to, alpha, beta);
+                    // value = std::min(value, eval);
+                    // beta = std::min(beta, value);
+                    // if (beta <= alpha and depth > treshold)
+                    // {
+                    //     // Alpha cutoff
+                    //     // std::cout << "cutoff A" << std::endl;
+                    //     return value;
+                    // }
                 }
             }
         }
@@ -1679,14 +1854,16 @@ namespace Movelist
                     while (move)
                     {
                         const Bit to = PopBit(move);
-                        eval = Callback_Move::template Queenmove<status, depth>(brd, pos, to, alpha, beta);
-                        value = std::min(value, eval);
-                        beta = std::min(beta, value);
-                        if (beta <= alpha and depth > 1)
-                        {
-                            // Alpha cutoff
-                            return value;
-                        }
+                        addMoveOrderingEntry(brd, moveList, pos, to, 0, QUEEN, Queenmove);
+                        // eval = Callback_Move::template Queenmove<status, depth>(brd, pos, to, alpha, beta);
+                        // value = std::min(value, eval);
+                        // beta = std::min(beta, value);
+                        // if (beta <= alpha and depth > treshold)
+                        // {
+                        //     // Alpha cutoff
+                        //     // std::cout << "cutoff A" << std::endl;
+                        //     return value;
+                        // }
                     }
                 }
                 else
@@ -1694,14 +1871,16 @@ namespace Movelist
                     while (move)
                     {
                         const Bit to = PopBit(move);
-                        eval = Callback_Move::template Rookmove<status, depth>(brd, pos, to, alpha, beta);
-                        value = std::min(value, eval);
-                        beta = std::min(beta, value);
-                        if (beta <= alpha and depth > 1)
-                        {
-                            // Alpha cutoff
-                            return value;
-                        }
+                        addMoveOrderingEntry(brd, moveList, pos, to, 0, ROOK, Rookmove);
+                        // eval = Callback_Move::template Rookmove<status, depth>(brd, pos, to, alpha, beta);
+                        // value = std::min(value, eval);
+                        // beta = std::min(beta, value);
+                        // if (beta <= alpha and depth > treshold)
+                        // {
+                        //     // Alpha cutoff
+                        //     // std::cout << "cutoff A" << std::endl;
+                        //     return value;
+                        // }
                     }
                 }
             }
@@ -1713,14 +1892,16 @@ namespace Movelist
                 while (move)
                 {
                     const Bit to = PopBit(move);
-                    eval = Callback_Move::template Rookmove<status, depth>(brd, 1ull << sq, to, alpha, beta);
-                    value = std::min(value, eval);
-                    beta = std::min(beta, value);
-                    if (beta <= alpha and depth > 1)
-                    {
-                        // Alpha cutoff
-                        return value;
-                    }
+                    addMoveOrderingEntry(brd, moveList, 1ull << sq, to, 0, ROOK, Rookmove);
+                    // eval = Callback_Move::template Rookmove<status, depth>(brd, 1ull << sq, to, alpha, beta);
+                    // value = std::min(value, eval);
+                    // beta = std::min(beta, value);
+                    // if (beta <= alpha and depth > treshold)
+                    // {
+                    //     // Alpha cutoff
+                    //     // std::cout << "cutoff A" << std::endl;
+                    //     return value;
+                    // }
                 }
             }
         }
@@ -1737,19 +1918,146 @@ namespace Movelist
                 while (move)
                 {
                     const Bit to = PopBit(move);
-                    eval = Callback_Move::template Queenmove<status, depth>(brd, 1ull << sq, to, alpha, beta);
-                    value = std::min(value, eval);
-                    beta = std::min(beta, value);
-                    if (beta <= alpha and depth > 1)
-                    {
-                        // Alpha cutoff
-                        return value;
-                    }
+                    addMoveOrderingEntry(brd, moveList, 1ull << sq, to, 0, QUEEN, Queenmove);
+                    // eval = Callback_Move::template Queenmove<status, depth>(brd, 1ull << sq, to, alpha, beta);
+                    // value = std::min(value, eval);
+                    // beta = std::min(beta, value);
+                    // if (beta <= alpha and depth > treshold)
+                    // {
+                    //     // Alpha cutoff
+                    //     // std::cout << "cutoff A" << std::endl;
+                    //     return value;
+                    // }
                 }
             }
         }
 
-        if (noCheck and value > 1)
+        // Order moves from best to worst
+        std::sort(moveList.begin(), moveList.end(),
+                  [](const MoveOrderingList &a, const MoveOrderingList &b)
+                  {
+                      return a.score > b.score;
+                  });
+
+        // std::cout << "START LIST:" << std::endl;
+        // std::size_t j = 0;
+        // while (j < moveList.size())
+        // {
+        //     std::cout << "Move TYPE " << moveList[j].moveType << " score: " << moveList[j].score << std::endl;
+        //     j++;
+        // }
+
+        // Movestack::Atk_EKing[depth - 1] = Movestack::Atk_King[depth]; // Default king atk for recursion
+
+        for (std::size_t i = 0; i < moveList.size(); i++)
+        {
+            const auto &move = moveList[i];
+
+            // Switch on the moveType
+            switch (move.moveType)
+            {
+            case Kingmove:
+                eval = Callback_Move::template Kingmove<status, depth>(brd, move.from, move.to, alpha, beta);
+                break;
+            case KingCastle:
+                eval = Callback_Move::template KingCastle<status, depth>(brd, move.from, move.to, alpha, beta);
+                break;
+            case Pawnmove:
+                eval = Callback_Move::template Pawnmove<status, depth>(brd, move.from, move.to, alpha, beta);
+                break;
+            case Pawnatk:
+                eval = Callback_Move::template Pawnatk<status, depth>(brd, move.from, move.to, alpha, beta);
+                break;
+            case PawnEnpassantTake:
+                eval = Callback_Move::template PawnEnpassantTake<status, depth>(brd, move.from, move.enemy, move.to, alpha, beta);
+                break;
+            case Pawnpush:
+                eval = Callback_Move::template Pawnpush<status, depth>(brd, move.from, move.to, alpha, beta);
+                break;
+            case Pawnpromote:
+                eval = Callback_Move::template Pawnpromote<status, depth>(brd, move.from, move.to, alpha, beta);
+                break;
+            case Knightmove:
+                eval = Callback_Move::template Knightmove<status, depth>(brd, move.from, move.to, alpha, beta);
+                break;
+            case Bishopmove:
+                eval = Callback_Move::template Bishopmove<status, depth>(brd, move.from, move.to, alpha, beta);
+                break;
+            case Rookmove:
+                eval = Callback_Move::template Rookmove<status, depth>(brd, move.from, move.to, alpha, beta);
+                break;
+            case Queenmove:
+                eval = Callback_Move::template Queenmove<status, depth>(brd, move.from, move.to, alpha, beta);
+                break;
+            default:
+                std::cout << "ERROR " << i << " has an unrecognized moveType: " << static_cast<int>(move.moveType) << "\n";
+                break;
+            }
+            value = std::min(value, eval);
+            beta = std::min(beta, value);
+            if (beta <= alpha and depth > treshold)
+            {
+                // Alpha cutoff
+                // std::cout << "cutoff A" << std::endl;
+                return value;
+            }
+        }
+
+        // Kingmoves
+        {
+            Bitloop(kingatk)
+            {
+                const Square sq = SquareOf(kingatk);
+                Movestack::Atk_EKing[depth - 1] = Lookup::King(sq);
+                eval = Callback_Move::template Kingmove<status, depth>(brd, King<white>(brd), 1ull << sq, alpha, beta);
+                value = std::min(value, eval);
+                beta = std::min(beta, value);
+                if (beta <= alpha and depth > treshold)
+                {
+                    // Alpha cutoff
+                    // std::cout << "cutoff A" << std::endl;
+                    return value;
+                }
+            }
+
+            // Castling
+            // Todo think about how to remove the template if a rook is taken that would have been able to castle
+            if constexpr (status.CanCastleLeft())
+            {
+                if (noCheck && status.CanCastleLeft(kingban, brd.Occ, Rooks<white>(brd)))
+                {
+                    Movestack::Atk_EKing[depth - 1] = Lookup::King(SquareOf(King<white>(brd) << 2));
+                    eval = Callback_Move::template KingCastle<status, depth>(brd, (King<white>(brd) | King<white>(brd) << 2), status.Castle_RookswitchL(), alpha, beta);
+                    value = std::min(value, eval);
+                    beta = std::min(beta, value);
+                    if (beta <= alpha and depth > treshold)
+                    {
+                        // Alpha cutoff
+                        // std::cout << "cutoff A" << std::endl;
+                        return value;
+                    }
+                }
+            }
+            if constexpr (status.CanCastleRight())
+            {
+                if (noCheck && status.CanCastleRight(kingban, brd.Occ, Rooks<white>(brd)))
+                {
+                    Movestack::Atk_EKing[depth - 1] = Lookup::King(SquareOf(King<white>(brd) >> 2));
+                    eval = Callback_Move::template KingCastle<status, depth>(brd, (King<white>(brd) | King<white>(brd) >> 2), status.Castle_RookswitchR(), alpha, beta);
+                    value = std::min(value, eval);
+                    beta = std::min(beta, value);
+                    if (beta <= alpha and depth > treshold)
+                    {
+                        // Alpha cutoff
+                        // std::cout << "cutoff A" << std::endl;
+                        return value;
+                    }
+                }
+            }
+            Movestack::Atk_EKing[depth - 1] = Movestack::Atk_King[depth]; // Default king atk for recursion
+        }
+
+        if (noCheck and value == std::numeric_limits<float>::max())
         {
             std::cout << "Stalemate Detected 070892" << std::endl;
             return 0;
@@ -1760,15 +2068,14 @@ namespace Movelist
             return 1.1;
         }
 
-        if (depth == 1)
-        {
-            value = Callback_Move::template runBatch<status>();
-            return value;
-        }
+        // if (depth == 1)
+        // {
+        //     value = Callback_Move::template runBatch<status>();
+        //     return value;
+        // }
 
         // std::cerr << "Tu nie powinno wpaść 2 " << std::endl;
         // std::cout << "depth: "<< depth << " value: " << value << " alpha: " << alpha << " beta: " << beta << std::endl;
         return value;
     }
-
 };

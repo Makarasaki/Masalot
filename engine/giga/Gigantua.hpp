@@ -13,6 +13,7 @@
 #include "Chess_Test.hpp"
 #include "../../training/include/chessnet.h"
 #include "../include/data_preparation.h"
+#include "../include/zorbist.hpp"
 
 ChessPosition createChessPosition(const Board &board,
 								  const BoardStatus &status,
@@ -25,37 +26,76 @@ ChessPosition createChessPosition(const Board &board,
 	//     epBitboard = 1ULL << epTarget.squareIndex;
 	// }
 
-	ChessPosition position = {
-		// White pieces
-		rotate180(board.WPawn, status.WhiteMove),
-		rotate180(board.WKnight, status.WhiteMove),
-		rotate180(board.WBishop, status.WhiteMove),
-		rotate180(board.WRook, status.WhiteMove),
-		rotate180(board.WQueen, status.WhiteMove),
-		rotate180(board.WKing, status.WhiteMove),
+	ChessPosition position = [&]()
+	{
+		if (status.WhiteMove)
+		{
+			return ChessPosition(
+				// White pieces
+				board.WPawn,
+				board.WKnight,
+				board.WBishop,
+				board.WRook,
+				board.WQueen,
+				board.WKing,
 
-		// Black pieces
-		rotate180(board.BPawn, status.WhiteMove),
-		rotate180(board.BKnight, status.WhiteMove),
-		rotate180(board.BBishop, status.WhiteMove),
-		rotate180(board.BRook, status.WhiteMove),
-		rotate180(board.BQueen, status.WhiteMove),
-		rotate180(board.BKing, status.WhiteMove),
+				// Black pieces
+				board.BPawn,
+				board.BKnight,
+				board.BBishop,
+				board.BRook,
+				board.BQueen,
+				board.BKing,
 
-		// En passant bitboard
-		rotate180(epTarget, status.WhiteMove),
+				// En passant bitboard
+				epTarget,
 
-		// White to move, from BoardStatus
-		status.WhiteMove,
+				// White to move, from BoardStatus
+				status.WhiteMove,
 
-		// Castling
-		// If WhiteMove == true, use white's castling flags for WCastle*
-		// and black's for BCastle*; if WhiteMove == false, swap them:
-		status.WhiteMove ? status.WCastleL : status.BCastleR, // WCastleR
-		status.WhiteMove ? status.WCastleR : status.BCastleL, // WCastleL
-		status.WhiteMove ? status.BCastleL : status.WCastleR, // BCastleR
-		status.WhiteMove ? status.BCastleR : status.WCastleL  // BCastleL
-	};
+				// Castling
+				// If WhiteMove == true, use white's castling flags for WCastle*
+				// and black's for BCastle*; if WhiteMove == false, swap them:
+				status.WCastleL,
+				status.WCastleR,
+				status.BCastleL,
+				status.BCastleR);
+		}
+		else
+		{
+			return ChessPosition(
+				// Black pieces
+				flipVertical(board.BPawn, status.WhiteMove),
+				flipVertical(board.BKnight, status.WhiteMove),
+				flipVertical(board.BBishop, status.WhiteMove),
+				flipVertical(board.BRook, status.WhiteMove),
+				flipVertical(board.BQueen, status.WhiteMove),
+				flipVertical(board.BKing, status.WhiteMove),
+
+				// White pieces
+				flipVertical(board.WPawn, status.WhiteMove),
+				flipVertical(board.WKnight, status.WhiteMove),
+				flipVertical(board.WBishop, status.WhiteMove),
+				flipVertical(board.WRook, status.WhiteMove),
+				flipVertical(board.WQueen, status.WhiteMove),
+				flipVertical(board.WKing, status.WhiteMove),
+
+				// En passant bitboard
+				flipVertical(epTarget, status.WhiteMove),
+
+				// White to move, from BoardStatus
+				status.WhiteMove,
+
+				// Castling
+				// If WhiteMove == true, use white's castling flags for WCastle*
+				// and black's for BCastle*; if WhiteMove == false, swap them:
+				status.BCastleL,
+				status.BCastleR,
+				status.WCastleL,
+				status.WCastleR);
+		}
+	}();
+
 	return position;
 }
 
@@ -75,8 +115,10 @@ public:
 		if (torch::cuda::is_available())
 		{
 			model->to(torch::kCUDA);
+			// model->to(torch::kCPU);
 		}
 		Movelist::Init(EPInit);
+		initZobristKeys();
 	}
 
 	template <class BoardStatus status>
@@ -108,52 +150,53 @@ public:
 	}
 
 	template <class BoardStatus status>
-	static _ForceInline ChessData positionToBitboards(Board &brd)
-	{
-		uint64_t allOnes = ~0ULL;
-		ChessData bitboards;
-		bitboards.bitboards.resize(13);
-
-		bitboards.bitboards[0] = intToBitboardWhites(brd.WPawn);
-		bitboards.bitboards[1] = intToBitboardWhites(brd.WKnight);
-		bitboards.bitboards[2] = intToBitboardWhites(brd.WBishop);
-		bitboards.bitboards[3] = intToBitboardWhites(brd.WRook);
-		bitboards.bitboards[4] = intToBitboardWhites(brd.WQueen);
-		bitboards.bitboards[5] = intToBitboardWhites(brd.WKing);
-
-		bitboards.bitboards[6] = intToBitboardBlacks(brd.BPawn);
-		bitboards.bitboards[7] = intToBitboardBlacks(brd.BKnight);
-		bitboards.bitboards[8] = intToBitboardBlacks(brd.BBishop);
-		bitboards.bitboards[9] = intToBitboardBlacks(brd.BRook);
-		bitboards.bitboards[10] = intToBitboardBlacks(brd.BQueen);
-		bitboards.bitboards[11] = intToBitboardBlacks(brd.BKing);
-
-		bitboards.bitboards[12] = intToBitboard(Movelist::EnPassantTarget);
-		return bitboards;
-	}
-
-	template <class BoardStatus status>
 	static _ForceInline float evaluate(Board &brd)
 	{
+		// 1. Generate a unique key for the current position
+		uint64_t key = computeZobristHash(brd, status, Movelist::EnPassantTarget);
+		// std::cout << "before init: " << key << std::endl;
+		// initZobristKeys();
+		// std::cout << "after init: " << key << std::endl;
+		// initZobristKeys();
+		// std::cout << "after2 init: " << key << std::endl;
+		// uint64_t key = combineHash<status>(brd, Movelist::EnPassantTarget);
+
+		// 2. Check if we have a cached evaluation for this position
+		auto it = evaluations_map->find(key);
+		if (it != evaluations_map->end())
+		{
+			// std::cout << "found position" << std::endl;
+			// Found a cached evaluation - just return it
+			return it->second;
+		}
+
 		ChessPosition position = createChessPosition(brd, status, Movelist::EnPassantTarget);
 
 		torch::Tensor positionINTensor = model->toTensor(position);
+
+		positionINTensor = positionINTensor.unsqueeze(0);
 		if (torch::cuda::is_available())
 		{
 			positionINTensor = positionINTensor.to(torch::kCUDA);
+			// positionINTensor = positionINTensor.to(torch::kCPU);
 		}
 
-		inputs.push_back(positionINTensor);
+		// inputs.push_back(positionINTensor);
 
 		// Perform the forward pass with the model
-		// torch::Tensor output = model->forward(positionINTensor);
+		torch::Tensor output = model->forward(positionINTensor);
 
-		// float eval_value = output.item<float>();
-		// (*evaluations_map)[key] = eval_value;
+		float eval_value = output.item<float>();
+
+		if (!status.WhiteMove)
+		{
+			eval_value *= -1;
+		}
+		(*evaluations_map)[key] = eval_value;
 
 		// std::cout << "Evaluation: " << eval_value << std::endl;
-		// return eval_value;
-		return 0;
+		return eval_value;
+		// return 0;
 	}
 
 	template <class BoardStatus status>
@@ -166,6 +209,7 @@ public:
 		if constexpr (status.WhiteMove)
 		{
 			// For White's move, return the highest evaluation
+			// float max_val = output.neg().max().item<float>();
 			float max_val = output.max().item<float>();
 			// std::cout << "WhiteMove: Returning max value = " << max_val << std::endl;
 			return max_val;
@@ -173,6 +217,7 @@ public:
 		else
 		{
 			// For Black's move, return the lowest evaluation
+			// float min_val = output.neg().min().item<float>();
 			float min_val = output.min().item<float>();
 			// std::cout << "BlackMove: Returning min value = " << min_val << std::endl;
 			return min_val;
@@ -182,7 +227,7 @@ public:
 	template <class BoardStatus status>
 	static _ForceInline float PerfT0(Board &brd)
 	{
-		// std::cout << "Status PERFT0" << std::endl;
+		// std::cout << status.WhiteMove << std::endl;
 		nodes++;
 		// return 0;
 		float eval = evaluate<status>(brd);
@@ -197,18 +242,28 @@ public:
 		nodes += Movelist::count<status>(brd);
 	}
 
-	template <class BoardStatus status, int depth>
+	template <bool IsAttacking, class BoardStatus status, int depth>
 	static _ForceInline float PerfT(Board &brd, float alpha, float beta)
 	{
-		// Movelist::EnumerateMoves<status, MoveReciever, depth>(brd);
+		static_assert(depth >= 0, "No negative depth allowed.");
 		if constexpr (depth == 0)
+		{
+			// std::cout << "depth == 0" << std::endl;
 			return PerfT0<status>(brd);
+		}
+		else if constexpr (!IsAttacking && depth == 0)
+		{
+			// std::cout << "Wpadło do (!IsAttacking && depth <= 1)" << std::endl;
+			return PerfT0<status>(brd);
+		}
 		else
-			// Tutaj movereceiver jest przekazywany jako Callback_Move
+		{
+			// std::cout << "Searching deeper" << std::endl;
 			return Movelist::EnumerateMoves<status, MoveReciever, depth>(brd, alpha, beta);
+		}
 	}
 
-#define ENABLEDBG 0
+#define ENABLEDBG 1
 #define ENABLEPRINT 0
 #define IFDBG if constexpr (ENABLEDBG)
 #define IFPRN if constexpr (ENABLEPRINT)
@@ -225,8 +280,17 @@ public:
 		Board next = Board::Move<BoardPiece::King, status.WhiteMove>(brd, from, to, to & Enemy<status.WhiteMove>(brd));
 		IFPRN std::cout << "Kingmove:\n"
 						<< _map(from, to, brd, next) << "\n";
-		// IFDBG Board::AssertBoardMove<status.WhiteMove>(brd, next, to & Enemy<status.WhiteMove>(brd));
-		return PerfT<status.KingMove(), depth - 1>(next, alpha, beta);
+		IFDBG Board::AssertBoardMove<status.WhiteMove>(brd, next, to & Enemy<status.WhiteMove>(brd));
+		bool isAttacking = (brd.Occ & to) != 0;
+		// std::cout << isAttacking << std::endl;
+		if (isAttacking)
+		{
+			return PerfT<true, status.KingMove(), depth - 1>(next, alpha, beta);
+		}
+		else
+		{
+			return PerfT<false, status.KingMove(), depth - 1>(next, alpha, beta);
+		}
 	}
 
 	template <class BoardStatus status, int depth>
@@ -235,8 +299,8 @@ public:
 		Board next = Board::MoveCastle<status.WhiteMove>(brd, kingswitch, rookswitch);
 		IFPRN std::cout << "KingCastle:\n"
 						<< _map(kingswitch, rookswitch, brd, next) << "\n";
-		// IFDBG Board::AssertBoardMove<status.WhiteMove>(brd, next, false);
-		return PerfT<status.KingMove(), depth - 1>(next, alpha, beta);
+		IFDBG Board::AssertBoardMove<status.WhiteMove>(brd, next, false);
+		return PerfT<false, status.KingMove(), depth - 1>(next, alpha, beta);
 	}
 
 	template <class BoardStatus status, int depth>
@@ -265,12 +329,13 @@ public:
 		Board next = Board::Move<BoardPiece::Pawn, status.WhiteMove, false>(brd, from, to);
 		IFPRN std::cout << "Pawnmove:\n"
 						<< _map(from, to, brd, next) << "\n";
-		// IFDBG Board::AssertBoardMove<status.WhiteMove>(brd, next, to & Enemy<status.WhiteMove>(brd));
+		IFDBG Board::AssertBoardMove<status.WhiteMove>(brd, next, to & Enemy<status.WhiteMove>(brd));
 		PawnCheck<status, depth>(EnemyKing<status.WhiteMove>(brd), to);
 
 		// globalMoveList.emplace_back(next, status.SilentMove(), Movelist::EnPassantTarget);
 
-		float eval = PerfT<status.SilentMove(), depth - 1>(next, alpha, beta);
+		float eval = PerfT<false, status.SilentMove(), depth - 1>(next, alpha, beta);
+
 		Movestack::Check_Status[depth - 1] = 0xffffffffffffffffull;
 		return eval;
 	}
@@ -281,9 +346,18 @@ public:
 		Board next = Board::Move<BoardPiece::Pawn, status.WhiteMove, true>(brd, from, to);
 		IFPRN std::cout << "Pawntake:\n"
 						<< _map(from, to, brd, next) << "\n";
-		// IFDBG Board::AssertBoardMove<status.WhiteMove>(brd, next, to & Enemy<status.WhiteMove>(brd));
+		IFDBG Board::AssertBoardMove<status.WhiteMove>(brd, next, to & Enemy<status.WhiteMove>(brd));
 		PawnCheck<status, depth>(EnemyKing<status.WhiteMove>(brd), to);
-		float eval = PerfT<status.SilentMove(), depth - 1>(next, alpha, beta);
+		bool isAttacking = (brd.Occ & to) != 0;
+		float eval;
+		if (isAttacking)
+		{
+			eval = PerfT<true, status.SilentMove(), depth - 1>(next, alpha, beta);
+		}
+		else
+		{
+			eval = PerfT<false, status.SilentMove(), depth - 1>(next, alpha, beta);
+		}
 		Movestack::Check_Status[depth - 1] = 0xffffffffffffffffull;
 		return eval;
 	}
@@ -294,9 +368,9 @@ public:
 		Board next = Board::MoveEP<status.WhiteMove>(brd, from, enemy, to);
 		IFPRN std::cout << "PawnEnpassantTake:\n"
 						<< _map(from | enemy, to, brd, next) << "\n";
-		// IFDBG Board::AssertBoardMove<status.WhiteMove>(brd, next, true);
+		IFDBG Board::AssertBoardMove<status.WhiteMove>(brd, next, true);
 		PawnCheck<status, depth>(EnemyKing<status.WhiteMove>(brd), to);
-		float eval = PerfT<status.SilentMove(), depth - 1>(next, alpha, beta);
+		float eval = PerfT<true, status.SilentMove(), depth - 1>(next, alpha, beta);
 		Movestack::Check_Status[depth - 1] = 0xffffffffffffffffull;
 		return eval;
 	}
@@ -307,11 +381,11 @@ public:
 		Board next = Board::Move<BoardPiece::Pawn, status.WhiteMove, false>(brd, from, to);
 		IFPRN std::cout << "Pawnpush:\n"
 						<< _map(from, to, brd, next) << "\n";
-		// IFDBG Board::AssertBoardMove<status.WhiteMove>(brd, next, to & Enemy<status.WhiteMove>(brd));
+		IFDBG Board::AssertBoardMove<status.WhiteMove>(brd, next, to & Enemy<status.WhiteMove>(brd));
 
 		Movelist::EnPassantTarget = to;
 		PawnCheck<status, depth>(EnemyKing<status.WhiteMove>(brd), to);
-		float eval = PerfT<status.PawnPush(), depth - 1>(next, alpha, beta);
+		float eval = PerfT<false, status.PawnPush(), depth - 1>(next, alpha, beta);
 		Movestack::Check_Status[depth - 1] = 0xffffffffffffffffull;
 		return eval;
 	}
@@ -323,18 +397,18 @@ public:
 		Board next1 = Board::MovePromote<BoardPiece::Queen, status.WhiteMove>(brd, from, to);
 		IFPRN std::cout << "Pawnpromote:\n"
 						<< _map(from, to, brd, next1) << "\n";
-		// IFDBG Board::AssertBoardMove<status.WhiteMove>(brd, next1, to & Enemy<status.WhiteMove>(brd));
-		float eval1 = PerfT<status.SilentMove(), depth - 1>(next1, alpha, beta);
+		IFDBG Board::AssertBoardMove<status.WhiteMove>(brd, next1, to & Enemy<status.WhiteMove>(brd));
+		float eval1 = PerfT<false, status.SilentMove(), depth - 1>(next1, alpha, beta);
 
 		Board next2 = Board::MovePromote<BoardPiece::Knight, status.WhiteMove>(brd, from, to);
 		KnightCheck<status, depth>(EnemyKing<status.WhiteMove>(brd), to);
-		float eval2 = PerfT<status.SilentMove(), depth - 1>(next2, alpha, beta);
+		float eval2 = PerfT<false, status.SilentMove(), depth - 1>(next2, alpha, beta);
 		Movestack::Check_Status[depth - 1] = 0xffffffffffffffffull;
 
 		Board next3 = Board::MovePromote<BoardPiece::Bishop, status.WhiteMove>(brd, from, to);
-		float eval3 = PerfT<status.SilentMove(), depth - 1>(next3, alpha, beta);
+		float eval3 = PerfT<false, status.SilentMove(), depth - 1>(next3, alpha, beta);
 		Board next4 = Board::MovePromote<BoardPiece::Rook, status.WhiteMove>(brd, from, to);
-		float eval4 = PerfT<status.SilentMove(), depth - 1>(next4, alpha, beta);
+		float eval4 = PerfT<false, status.SilentMove(), depth - 1>(next4, alpha, beta);
 		if constexpr (status.WhiteMove)
 		{
 			// For White's move, return the highest evaluation
@@ -353,9 +427,20 @@ public:
 		Board next = Board::Move<BoardPiece::Knight, status.WhiteMove>(brd, from, to, to & Enemy<status.WhiteMove>(brd));
 		IFPRN std::cout << "Knightmove:\n"
 						<< _map(from, to, brd, next) << "\n";
-		// IFDBG Board::AssertBoardMove<status.WhiteMove>(brd, next, to & Enemy<status.WhiteMove>(brd));
+		IFDBG Board::AssertBoardMove<status.WhiteMove>(brd, next, to & Enemy<status.WhiteMove>(brd));
 		KnightCheck<status, depth>(EnemyKing<status.WhiteMove>(brd), to);
-		float eval = PerfT<status.SilentMove(), depth - 1>(next, alpha, beta);
+
+		bool isAttacking = (brd.Occ & to) != 0;
+		float eval;
+		if (isAttacking)
+		{
+			eval = PerfT<true, status.SilentMove(), depth - 1>(next, alpha, beta);
+		}
+		else
+		{
+			eval = PerfT<false, status.SilentMove(), depth - 1>(next, alpha, beta);
+		}
+
 		Movestack::Check_Status[depth - 1] = 0xffffffffffffffffull;
 		return eval;
 	}
@@ -366,8 +451,16 @@ public:
 		Board next = Board::Move<BoardPiece::Bishop, status.WhiteMove>(brd, from, to, to & Enemy<status.WhiteMove>(brd));
 		IFPRN std::cout << "Bishopmove:\n"
 						<< _map(from, to, brd, next) << "\n";
-		// IFDBG Board::AssertBoardMove<status.WhiteMove>(brd, next, to & Enemy<status.WhiteMove>(brd));
-		return PerfT<status.SilentMove(), depth - 1>(next, alpha, beta);
+		IFDBG Board::AssertBoardMove<status.WhiteMove>(brd, next, to & Enemy<status.WhiteMove>(brd));
+		bool isAttacking = (brd.Occ & to) != 0;
+		if (isAttacking)
+		{
+			return PerfT<true, status.SilentMove(), depth - 1>(next, alpha, beta);
+		}
+		else
+		{
+			return PerfT<false, status.SilentMove(), depth - 1>(next, alpha, beta);
+		}
 	}
 
 	template <class BoardStatus status, int depth>
@@ -376,18 +469,37 @@ public:
 		Board next = Board::Move<BoardPiece::Rook, status.WhiteMove>(brd, from, to, to & Enemy<status.WhiteMove>(brd));
 		IFPRN std::cout << "Rookmove:\n"
 						<< _map(from, to, brd, next) << "\n";
-		// IFDBG Board::AssertBoardMove<status.WhiteMove>(brd, next, to & Enemy<status.WhiteMove>(brd));
+		IFDBG Board::AssertBoardMove<status.WhiteMove>(brd, next, to & Enemy<status.WhiteMove>(brd));
+		bool isAttacking = (brd.Occ & to) != 0;
 		if constexpr (status.CanCastle())
 		{
 			if (status.IsLeftRook(from))
-				return PerfT<status.RookMove_Left(), depth - 1>(next, alpha, beta);
+				return PerfT<false, status.RookMove_Left(), depth - 1>(next, alpha, beta);
 			else if (status.IsRightRook(from))
-				return PerfT<status.RookMove_Right(), depth - 1>(next, alpha, beta);
+				return PerfT<false, status.RookMove_Right(), depth - 1>(next, alpha, beta);
 			else
-				return PerfT<status.SilentMove(), depth - 1>(next, alpha, beta);
+			{
+				if (isAttacking)
+				{
+					return PerfT<true, status.SilentMove(), depth - 1>(next, alpha, beta);
+				}
+				else
+				{
+					return PerfT<false, status.SilentMove(), depth - 1>(next, alpha, beta);
+				}
+			}
 		}
 		else
-			return PerfT<status.SilentMove(), depth - 1>(next, alpha, beta);
+		{
+			if (isAttacking)
+			{
+				return PerfT<true, status.SilentMove(), depth - 1>(next, alpha, beta);
+			}
+			else
+			{
+				return PerfT<false, status.SilentMove(), depth - 1>(next, alpha, beta);
+			}
+		}
 	}
 
 	template <class BoardStatus status, int depth>
@@ -396,13 +508,21 @@ public:
 		Board next = Board::Move<BoardPiece::Queen, status.WhiteMove>(brd, from, to, to & Enemy<status.WhiteMove>(brd));
 		IFPRN std::cout << "Queenmove:\n"
 						<< _map(from, to, brd, next) << "\n";
-		// IFDBG Board::AssertBoardMove<status.WhiteMove>(brd, next, to & Enemy<status.WhiteMove>(brd));
-		return PerfT<status.SilentMove(), depth - 1>(next, alpha, beta);
+		IFDBG Board::AssertBoardMove<status.WhiteMove>(brd, next, to & Enemy<status.WhiteMove>(brd));
+		bool isAttacking = (brd.Occ & to) != 0;
+		if (isAttacking)
+		{
+			return PerfT<true, status.SilentMove(), depth - 1>(next, alpha, beta);
+		}
+		else
+		{
+			return PerfT<false, status.SilentMove(), depth - 1>(next, alpha, beta);
+		}
 	}
 };
 
 template <class BoardStatus status>
-static float PerfT(std::string_view def, Board &brd, int depth, float alpha, float beta, ChessNet model, std::unordered_map<uint64_t, float> &evaluations_map)
+static float PerfT(std::string_view def, Board &brd, int depth, float alpha, float beta, ChessNet &model, std::unordered_map<uint64_t, float> &evaluations_map)
 {
 	MoveReciever::Init(brd, FEN::FenEnpassant(def), model, evaluations_map);
 
@@ -413,58 +533,58 @@ static float PerfT(std::string_view def, Board &brd, int depth, float alpha, flo
 		return MoveReciever::PerfT0<status>(brd);
 	case 1:
 		Movelist::InitStack<status, 1>(brd);
-		return MoveReciever::PerfT<status, 1>(brd, alpha, beta); // Keep this as T1
+		return MoveReciever::PerfT<false, status, 1>(brd, alpha, beta); // Keep this as T1
 	case 2:
 		Movelist::InitStack<status, 2>(brd);
-		return MoveReciever::PerfT<status, 2>(brd, alpha, beta);
+		return MoveReciever::PerfT<false, status, 2>(brd, alpha, beta);
 	case 3:
 		Movelist::InitStack<status, 3>(brd);
-		return MoveReciever::PerfT<status, 3>(brd, alpha, beta);
+		return MoveReciever::PerfT<false, status, 3>(brd, alpha, beta);
 	case 4:
 		Movelist::InitStack<status, 4>(brd);
-		return MoveReciever::PerfT<status, 4>(brd, alpha, beta);
+		return MoveReciever::PerfT<false, status, 4>(brd, alpha, beta);
 	case 5:
 		Movelist::InitStack<status, 5>(brd);
-		return MoveReciever::PerfT<status, 5>(brd, alpha, beta);
+		return MoveReciever::PerfT<false, status, 5>(brd, alpha, beta);
 	case 6:
 		Movelist::InitStack<status, 6>(brd);
-		return MoveReciever::PerfT<status, 6>(brd, alpha, beta);
+		return MoveReciever::PerfT<false, status, 6>(brd, alpha, beta);
 	case 7:
 		Movelist::InitStack<status, 7>(brd);
-		return MoveReciever::PerfT<status, 7>(brd, alpha, beta);
+		return MoveReciever::PerfT<false, status, 7>(brd, alpha, beta);
 	case 8:
 		Movelist::InitStack<status, 8>(brd);
-		return MoveReciever::PerfT<status, 8>(brd, alpha, beta);
-	case 9:
-		Movelist::InitStack<status, 9>(brd);
-		return MoveReciever::PerfT<status, 9>(brd, alpha, beta);
-	case 10:
-		Movelist::InitStack<status, 10>(brd);
-		return MoveReciever::PerfT<status, 10>(brd, alpha, beta);
-	case 11:
-		Movelist::InitStack<status, 11>(brd);
-		return MoveReciever::PerfT<status, 11>(brd, alpha, beta);
-	case 12:
-		Movelist::InitStack<status, 12>(brd);
-		return MoveReciever::PerfT<status, 12>(brd, alpha, beta);
-	case 13:
-		Movelist::InitStack<status, 13>(brd);
-		return MoveReciever::PerfT<status, 13>(brd, alpha, beta);
-	case 14:
-		Movelist::InitStack<status, 14>(brd);
-		return MoveReciever::PerfT<status, 14>(brd, alpha, beta);
-	case 15:
-		Movelist::InitStack<status, 15>(brd);
-		return MoveReciever::PerfT<status, 15>(brd, alpha, beta);
-	case 16:
-		Movelist::InitStack<status, 16>(brd);
-		return MoveReciever::PerfT<status, 16>(brd, alpha, beta);
-	case 17:
-		Movelist::InitStack<status, 17>(brd);
-		return MoveReciever::PerfT<status, 17>(brd, alpha, beta);
-	case 18:
-		Movelist::InitStack<status, 18>(brd);
-		return MoveReciever::PerfT<status, 18>(brd, alpha, beta);
+		return MoveReciever::PerfT<false, status, 8>(brd, alpha, beta);
+	// case 9:
+	// 	Movelist::InitStack<status, 9>(brd);
+	// 	return MoveReciever::PerfT<false, status, 9>(brd, alpha, beta);
+	// case 10:
+	// 	Movelist::InitStack<status, 10>(brd);
+	// 	return MoveReciever::PerfT<false, status, 10>(brd, alpha, beta);
+	// case 11:
+	// 	Movelist::InitStack<status, 11>(brd);
+	// 	return MoveReciever::PerfT<false, status, 11>(brd, alpha, beta);
+	// case 12:
+	// 	Movelist::InitStack<status, 12>(brd);
+	// 	return MoveReciever::PerfT<false, status, 12>(brd, alpha, beta);
+	// case 13:
+	// 	Movelist::InitStack<status, 13>(brd);
+	// 	return MoveReciever::PerfT<false, status, 13>(brd, alpha, beta);
+	// case 14:
+	// 	Movelist::InitStack<status, 14>(brd);
+	// 	return MoveReciever::PerfT<false, status, 14>(brd, alpha, beta);
+	// case 15:
+	// 	Movelist::InitStack<status, 15>(brd);
+	// 	return MoveReciever::PerfT<false, status, 15>(brd, alpha, beta);
+	// case 16:
+	// 	Movelist::InitStack<status, 16>(brd);
+	// 	return MoveReciever::PerfT<false, status, 16>(brd, alpha, beta);
+	// case 17:
+	// 	Movelist::InitStack<status, 17>(brd);
+	// 	return MoveReciever::PerfT<false, status, 17>(brd, alpha, beta);
+	// case 18:
+	// 	Movelist::InitStack<status, 18>(brd);
+	// 	return MoveReciever::PerfT<false, status, 18>(brd, alpha, beta);
 	default:
 		std::cout << "Depth not impl yet" << std::endl;
 		return 2137;

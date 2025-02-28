@@ -54,10 +54,7 @@
 // // This macro makes it easy to create std::shared_ptr<ChessNetLinear>
 // TORCH_MODULE(ChessNetLinear);
 
-
 // #endif // CHESSNET_H
-
-
 
 #ifndef CHESSNET_H
 #define CHESSNET_H
@@ -67,12 +64,15 @@
 #include <vector>
 #include <cstdint>
 
-struct BatchData {
-    torch::Tensor inputs;   // Shape: [batch_size, 837]
-    torch::Tensor targets;  // Shape: [batch_size]
+struct BatchData
+{
+    torch::Tensor inputs;  // Shape: [batch_size, 837]
+    torch::Tensor targets; // Shape: [batch_size]
+    int64_t last_rowid;
 };
 
-struct ChessPosition {
+struct ChessPosition
+{
     const uint64_t WPawn;
     const uint64_t WKnight;
     const uint64_t WBishop;
@@ -95,20 +95,37 @@ struct ChessPosition {
 
     const bool EnemyCastleL;
     const bool EnemyCastleR;
+
+    // Constructor initializes all fields
+    ChessPosition(uint64_t wP, uint64_t wN, uint64_t wB, uint64_t wR, uint64_t wQ, uint64_t wK,
+                  uint64_t bP, uint64_t bN, uint64_t bB, uint64_t bR, uint64_t bQ, uint64_t bK,
+                  uint64_t enp, bool whiteMv,
+                  bool myCastL, bool myCastR,
+                  bool enemyCastL, bool enemyCastR)
+        : WPawn(wP), WKnight(wN), WBishop(wB), WRook(wR), WQueen(wQ), WKing(wK)
+
+          ,
+          BPawn(bP), BKnight(bN), BBishop(bB), BRook(bR), BQueen(bQ), BKing(bK)
+
+          ,
+          EnPassant(enp), WhiteMove(whiteMv), MyCastleL(myCastL), MyCastleR(myCastR), EnemyCastleL(enemyCastL), EnemyCastleR(enemyCastR)
+    {
+    }
 };
 
-std::vector<std::vector<int>> intToBitboard(uint64_t bitboard);
+std::vector<std::vector<int>> intToBitboard(uint64_t bitboard, int value);
 
-std::vector<std::vector<int>> intToBitboardWhites(uint64_t bitboard);
+// std::vector<std::vector<int>> intToBitboardWhites(uint64_t bitboard);
 
-std::vector<std::vector<int>> intToBitboardBlacks(uint64_t bitboard);
+// std::vector<std::vector<int>> intToBitboardBlacks(uint64_t bitboard);
 
 std::vector<int> intToVector64White(uint64_t bitboard);
 
 // ----------------------------------------------
 // Convolution-based ChessNet (updated as a class)
 // ----------------------------------------------
-class ChessNetConvImpl : public torch::nn::Module {
+class ChessNetConvImpl : public torch::nn::Module
+{
 public:
     // Constructor
     ChessNetConvImpl();
@@ -142,7 +159,8 @@ TORCH_MODULE(ChessNetConv);
 // ----------------------------------------------
 // Linear ChessNet
 // ----------------------------------------------
-class ChessNetLinearImpl : public torch::nn::Module {
+class ChessNetLinearImpl : public torch::nn::Module
+{
 public:
     // Constructor
     ChessNetLinearImpl();
@@ -177,10 +195,75 @@ TORCH_MODULE(ChessNetLinear);
 //                                   const BoardStatus &status,
 //                                   const uint64_t &epTarget);
 
+uint64_t flipVertical(uint64_t board, bool isWhite);
+
 uint64_t rotate180(uint64_t board, bool isWhite);
 
 // board and status to chess position
 
+
+
+// Example enum for piece types
+enum PieceType {
+    PAWN   = 0,
+    KNIGHT = 1,
+    BISHOP = 2,
+    ROOK   = 3,
+    QUEEN  = 4,
+    KING   = 5,
+    NONE_PIECE = 6
+};
+
+enum MoveType {
+    Kingmove = 0,
+    KingCastle = 1,
+    Pawnmove = 2,
+    Pawnatk = 3,
+    PawnEnpassantTake = 4,
+    Pawnpush = 5,
+    Pawnpromote = 6,
+    Knightmove = 7,
+    Bishopmove = 8,
+    Rookmove = 9,
+    Queenmove = 10
+};
+
+// ------------------------------------------------------------
+// Function to calculate the HalfKP feature index
+uint32_t calculateHalfKPIndex(uint64_t kingSquare, uint64_t pieceSquare,
+                              PieceType pieceType, bool isWhite);
+// ------------------------------------------------------------
+
+// ------------------------------------------------------------
+// Define the NNUE HalfKP network architecture
+// ------------------------------------------------------------
+struct NNUEHalfKPImpl : torch::nn::Module {
+    // Default constructor (with some hard-coded values)
+    NNUEHalfKPImpl();
+
+    // Forward pass
+    torch::Tensor forward(torch::Tensor x);
+
+    // Initialize weights
+    void initialize_weights();
+
+    // Convert ChessPosition to a tensor of HalfKP feature indices
+    torch::Tensor toTensor(const ChessPosition &position);
+
+private:
+    // Layers
+    torch::nn::Linear fc1{nullptr}, fc2{nullptr}, fc3{nullptr};
+    torch::nn::BatchNorm1d bn1{nullptr}, bn2{nullptr}, bn3{nullptr};
+
+    // Function to calculate the HalfKP input vector
+    std::vector<int64_t> createHalfKPInputVector(const ChessPosition &position);
+};
+
+// Torch’s macro that defines a module holder class (NNUEHalfKP)
+// so you can instantiate it as `NNUEHalfKP model(...)`.
+TORCH_MODULE(NNUEHalfKP);
+
+// using ChessNet = ChessNetLinear;
 using ChessNet = ChessNetConv;
 
 #endif // CHESSNET_H

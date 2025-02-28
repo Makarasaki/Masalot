@@ -224,6 +224,7 @@ public:
 
 };
 
+// #ifndef IGNORE_MOVE_GEN_OPERATOR
 std::ostream& operator<<(std::ostream& os, const BoardStatus& dt);
 std::ostream& operator<<(std::ostream& os, const BoardStatus& dt)
 {
@@ -246,6 +247,7 @@ std::ostream& operator<<(std::ostream& os, const BoardStatus& dt)
     }
     return os;
 }
+// #endif
 
 enum class FenField {
     white,
@@ -255,7 +257,6 @@ enum class FenField {
     BCastleL,
     BCastleR
 };
-
 
 
 static std::string _map(uint64_t val1, uint64_t val2, uint64_t val3)
@@ -580,7 +581,7 @@ struct Board {
             return Board(bp ^ mov, bn, bb, br, bq, bk, wp & rem, wn & rem, wb & rem, wr & rem, wq & rem, wk);
         }
     }
-
+#define _DEBUG 1
 #ifdef _DEBUG
     _Inline uint64_t BlackPieceCount() const {
         return Bitcount(Black);
@@ -595,6 +596,21 @@ struct Board {
     template<bool IsWhite>
     _Inline static void AssertBoardMove(const Board& before, const Board& after, bool IsTaking)
     {
+        
+        // std::cout << IsTaking << std::endl;
+        // std::cout << before.WBishop << std::endl;
+        // std::cout << before.WPawn << std::endl;
+        // std::cout << before.WQueen << std::endl;
+        // std::cout << before.WKing << std::endl;
+        // std::cout << before.WKnight << std::endl;
+        // std::cout << before.WRook << std::endl;
+        // std::cout << "wpadło do AssertBoardMove" << std::endl;
+        // std::cout << after.WBishop << std::endl;
+        // std::cout << after.WPawn << std::endl;
+        // std::cout << after.WQueen << std::endl;
+        // std::cout << after.WKing << std::endl;
+        // std::cout << after.WKnight << std::endl;
+        // std::cout << after.WRook << std::endl;
         m_assert(before.BlackPieceCount() + before.WhitePiecesCount() == before.AllPiecesCount(), "Some squares are taken twice!");
         m_assert(after.BlackPieceCount() + after.WhitePiecesCount() == after.AllPiecesCount(), "Some squares are taken twice after a move!");
         if (IsTaking) {
@@ -638,6 +654,13 @@ struct Board {
         {
             const uint64_t rem = ~to;
             if constexpr (IsWhite) {
+                // if constexpr (BoardPiece::Pawn == piece)    std::cout << "Pawn" << std::endl;
+                // if constexpr (BoardPiece::Knight == piece)  std::cout << "Knight" << std::endl;
+                // if constexpr (BoardPiece::Bishop == piece)  std::cout << "Bishop" << std::endl;
+                // if constexpr (BoardPiece::Rook == piece)    std::cout << "Rook" << std::endl;
+                // if constexpr (BoardPiece::Queen == piece)   std::cout << "Queen" << std::endl;
+                // if constexpr (BoardPiece::King == piece)    std::cout << "King" << std::endl;
+                // std::cout << from << " -> " << to << std::endl;
                 m_assert((bk & mov) == 0, "Taking Black King is not legal!");
                 m_assert((to & existing.White) == 0, "Cannot move to square of same white color!");
                 if constexpr (BoardPiece::Pawn == piece)    return Board(bp & rem, bn & rem, bb & rem, br & rem, bq & rem, bk, wp ^ mov, wn, wb, wr, wq, wk);
@@ -740,7 +763,7 @@ static std::string _map(uint64_t val1, uint64_t val2, const Board& val3, const B
 /// Call this via _func(brd)
 /// </summary>
 #define PositionToTemplate(func) \
-static inline float _##func(std::string_view pos, int depth, float alpha, float beta, ChessNet model, std::unordered_map<uint64_t, float> &evaluations_map) { \
+static inline float _##func(std::string_view pos, int depth, float alpha, float beta, ChessNet &model, std::unordered_map<uint64_t, float> &evaluations_map) { \
 const bool WH = FEN::FenInfo<FenField::white>(pos);\
 const bool EP = FEN::FenInfo<FenField::hasEP>(pos);\
 const bool BL = FEN::FenInfo<FenField::BCastleL>(pos);\
