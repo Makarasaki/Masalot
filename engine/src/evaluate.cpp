@@ -1,16 +1,12 @@
 #include "../include/move_gen.h"
 #include "../include/evaluate.h"
 #include "../include/cloudDatabase.h"
-// #include "../giga/Chess_Base.hpp"
 #include "../giga/Gigantua.hpp"
-// #include "../include/data_preparation.h"
-// #include "../include/chessnet.h"
 #include <algorithm>  // For std::shuffle
 #include <random>    
 #include <iostream>
 #include <limits>
 #include <future>
-// #include <unordered_map>
 
 bool isWhite(const std::string &fen)
 {
@@ -100,72 +96,6 @@ std::string stripFen(const std::string &fen) {
     return board + " " + turn + " " + castling + " " + enPassant;
 }
 
-// 2808.73 seconds.
-// Search function to find the best move.
-// std::string search_best_move(ChessNet model, std::string pos, int depth, std::unordered_map<uint64_t, float> &evaluations_map)
-// {
-//     std::string response = getBestMoveFromCDB(pos);
-//     std::cout << "response from database: " << response << std::endl;
-//     if(!(response == "nobestmove"))
-//     {
-//         return response;
-//     }
-//     int goDeeperTreshold = 20;
-//     if (countBoardPoints(pos) < goDeeperTreshold){
-//         std::cout << "Few pieces on the board, searching deeper" << std::endl;
-//         goDeeperTreshold += 2;
-//     }
-//     // change
-//     bool isWhite_var = isWhite(pos);
-//     float best_eval;
-//     if (isWhite_var)
-//     {
-//         best_eval = std::numeric_limits<float>::lowest();
-//     }
-//     else
-//     {
-//         best_eval = std::numeric_limits<float>::max();
-//     }
-//     std::string best_move = "dupa blada";
-//     std::vector<std::string> positions = generate_positions(pos, isWhite_var);
-//     int sumOfNodes = 0;
-//     // std::cout << "1" << isWhite_var << std::endl;
-//     // std::cout << "2" << isWhite_var << std::endl;
-//     // std::cout << "pos " << positions[1] << std::endl;
-
-//     for (const auto &new_pos : positions)
-//     {
-//         // float eval = alpha_beta(model, new_pos, depth - 1, std::numeric_limits<float>::min(), std::numeric_limits<float>::max(), !isWhite_var);
-//         std::cout << "Evaluating positionn: " << new_pos << std::endl;
-//         float eval = _PerfT(new_pos, depth - 1, std::numeric_limits<float>::lowest(), std::numeric_limits<float>::max(), model, evaluations_map);
-//         std::cout << "nodes: " << MoveReceiver::nodes << std::endl;
-//         std::cout << "eval: " << eval << std::endl;
-//         sumOfNodes += MoveReceiver::nodes;
-//         if (isWhite_var)
-//         {
-//             // best_eval = std::max(best_eval, eval);
-//             if (eval >= 1) {return new_pos;}
-//             if (eval > best_eval)
-//             {
-//                 best_eval = eval;
-//                 best_move = new_pos;
-//             }
-//         }
-//         else
-//         {   
-//             if (eval <= -1) {return new_pos;}
-//             if (eval < best_eval)
-//             {
-//                 best_eval = eval;
-//                 best_move = new_pos;
-//             }
-//         }
-//     }
-//     std::cout << "Best Move: " << best_move << std::endl;
-//     std::cout << "eval: " << best_eval << std::endl;
-//     std::cout << "Number of positions evaluated: " << sumOfNodes << std::endl;
-//     return best_move;
-// }
 
 bool isSafeMove(const std::string &candidate_pos, 
     const std::unordered_set<std::string> &previous_positions) {
@@ -260,9 +190,6 @@ bestMoveInfo search_best_move(
     // 4. Generate all next positions (candidate moves)
     std::vector<std::string> next_positions = generate_positions(pos, isWhiteTurn);
 
-    // std::random_device rd;  // Seed for random number engine
-    // std::mt19937 g(rd());   // Mersenne Twister random generator
-    // std::shuffle(next_positions.begin(), next_positions.end(), g);
 
     if (next_positions.empty())
     {
@@ -409,89 +336,3 @@ bestMoveInfo search_best_move(
 
     return chosen_move;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// Run Pararell:
-// std::string search_best_move(ChessNet model, std::string pos, int depth, std::unordered_map<uint64_t, float> &evaluations_map)
-// {
-// // 1. Possibly check an opening database
-// std::string response = getBestMoveFromCDB(pos);
-// std::cout << "response from database: " << response << std::endl;
-// // if (response != "nobestmove") {
-// //     return response;
-// // }
-
-// // 2. Determine if it's White to move
-// bool isWhite_var = isWhite(pos);
-
-// // 3. Initialize best_eval
-// float best_eval = isWhite_var
-// ? std::numeric_limits<float>::lowest()
-// : std::numeric_limits<float>::max();
-
-// std::string best_move = "NO_MOVE_FOUND";
-// std::vector<std::string> positions = generate_positions(pos, isWhite_var);
-
-// // 4. Launch parallel tasks for each new position
-// std::vector<std::future<std::pair<std::string, float>>> tasks;
-// tasks.reserve(positions.size());
-
-// for (const auto &new_pos : positions)
-// {
-// // Capture new_pos by value in the lambda, and pass references to everything else as needed
-// tasks.push_back(std::async(std::launch::async, [=, &model, &evaluations_map]() {
-// // Evaluate the position
-// float eval = _PerfT(new_pos, depth - 1,
-//        std::numeric_limits<float>::lowest(),
-//        std::numeric_limits<float>::max(),
-//        model, evaluations_map);
-// // Return a pair: (move, eval)
-// return std::make_pair(new_pos, eval);
-// }));
-// }
-
-// // 5. Collect the results and choose the best move
-// for (auto &task : tasks)
-// {
-// auto [pos_string, eval] = task.get();  // Wait for the thread to finish and get result
-// std::cout << "pos: " << pos_string << ", eval: " << eval << "\n";
-
-// if (isWhite_var) {
-// if (eval >= 1.0f) {
-// // As soon as we find a winning eval, we can return
-// return pos_string;
-// }
-// if (eval > best_eval) {
-// best_eval = eval;
-// best_move = pos_string;
-// }
-// } else {
-// if (eval <= -1.0f) {
-// // As soon as we find a strongly losing eval (for White),
-// // that might be winning for Black, so return
-// return pos_string;
-// }
-// if (eval < best_eval) {
-// best_eval = eval;
-// best_move = pos_string;
-// }
-// }
-// }
-
-// std::cout << "Best move: " << best_move << "\n";
-// std::cout << "eval: " << best_eval << "\n";
-// return best_move;
-// }

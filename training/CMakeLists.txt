@@ -91,24 +91,6 @@ target_link_libraries(training
 # Set the required flags for linking libtorch
 set_property(TARGET training PROPERTY CXX_STANDARD 17)
 
-# Check if CUDA is available in libtorch
-# if(TORCH_CUDA_VERSION)
-#     message(STATUS "CUDA support enabled.")
-    
-#     # Ensure CUDA is properly configured
-#     set(CMAKE_CUDA_STANDARD 14)  # Adjust as necessary
-#     set(CMAKE_CUDA_SEPARABLE_COMPILATION ON)
-
-#     # Specify CUDA architectures (update these to match your GPU capabilities)
-#     set(CMAKE_CUDA_ARCH_BIN "61")  # Adjust based on your GPU architecture
-#     set(CMAKE_CUDA_ARCH_PTX "61")  # Adjust based on your GPU architecture
-    
-#     # Ensure CUDA support is linked
-#     target_link_libraries(training "${TORCH_CUDA_LIBRARIES}")
-# else()
-#     message(STATUS "CUDA support not found. Building for CPU.")
-# endif()
-
 # Required to suppress RPath errors
 set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)

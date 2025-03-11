@@ -277,12 +277,6 @@ torch::Tensor ChessNetLinearImpl::forward(torch::Tensor x)
     x = bn3(x);
     x = torch::tanh(x);
 
-    // Debug: print stats
-    // std::cout << "output avg: " << x.mean().item().toFloat() << std::endl;
-    // std::cout << "output range: " << x.min().item().toFloat()
-    //           << " to " << x.max().item().toFloat() << std::endl;
-
-    // shape: [batch_size, 1]
     return x;
 }
 
@@ -456,12 +450,6 @@ torch::Tensor NNUEHalfKPImpl::forward(torch::Tensor x)
     x = fc3->forward(x);
     x = bn3->forward(x);
     x = torch::tanh(x);
-
-    // Debugging info (optional)
-    // std::cout << "output avg:   " << x.mean().item<float>() << std::endl;
-    // std::cout << "output range: "
-    //           << x.min().item<float>() << " to "
-    //           << x.max().item<float>() << std::endl;
 
     return x;
 }

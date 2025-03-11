@@ -13,11 +13,6 @@
 #include <fstream>
 #include "../include/evaluate.h"
 
-// #define IGNORE_MOVE_GEN_OPERATOR
-// #include "../include/zorbist.h"
-// #undef IGNORE_MOVE_GEN_OPERATOR
-
-// #include "../include/chessnet.h"
 
 const int PORT = 12346;
 const int BUFFER_SIZE = 1024;
@@ -42,16 +37,13 @@ void handle_connection(int client_socket)
         input_archive.load_from("../../training/NN_weights/model_V1.5_C_FV_vlack_andwhite_evals_scaled_10e_weighted_lr_1e4_final.pt");
         model->load(input_archive); // Load the weights into the model
         model->eval();
-        // Check if CUDA is available
         if (torch::cuda::is_available())
         {
             model->to(torch::kCUDA);
-            // model->to(torch::kCPU);
             std::cout << "Using CUDA" << std::endl;
         }
         else
         {
-            // If not available, keep on CPU
             model->to(torch::kCPU);
         }
         std::cout << "Model weights loaded successfully!" << std::endl;
@@ -119,7 +111,6 @@ void handle_connection(int client_socket)
             auto end_time = std::chrono::high_resolution_clock::now();
             std::chrono::duration<float> duration = end_time - start_time;
             std::cout << "Time taken to find best move: " << duration.count() << " seconds." << std::endl;
-            // std::cout << "Best move: " << best_move_fen << std::endl;
 
             log_csv << moveInfo.move << ","
             << moveInfo.eval << ","
