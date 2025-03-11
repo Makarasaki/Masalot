@@ -1,3 +1,5 @@
+// https://github.com/Gigantua/Gigantua
+
 #pragma once
 #include "Chess_Base.hpp"
 

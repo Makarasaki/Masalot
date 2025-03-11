@@ -263,7 +263,43 @@ private:
 // so you can instantiate it as `NNUEHalfKP model(...)`.
 TORCH_MODULE(NNUEHalfKP);
 
+// ----------------------------------------------
+// Convolution-based ChessNet (updated as a class)
+// ----------------------------------------------
+class ChessNetConv2Impl : public torch::nn::Module
+{
+public:
+    // Constructor
+    ChessNetConv2Impl();
+
+    // Forward pass
+    torch::Tensor forward(torch::Tensor x);
+
+    // Initialization
+    void initialize_weights();
+
+    // Optional static helper for converting bitboards to a tensor
+    torch::Tensor toTensor(const ChessPosition &position);
+
+private:
+    // Convolutional layers
+    torch::nn::Conv2d conv1, conv2;
+
+    // BatchNorm2d for each conv layer
+    torch::nn::BatchNorm2d bn1, bn2;
+
+    // Flatten BN (and fully connected) layers
+    torch::nn::BatchNorm1d fc1_bn, fc2_bn, fc3_bn, conv_flat_bn;
+
+    // Fully connected layers
+    torch::nn::Linear fc1, fc2, fc3;
+};
+
+// This macro will create a typedef: using ChessNet = std::shared_ptr<ChessNetConv>;
+TORCH_MODULE(ChessNetConv2);
+
 // using ChessNet = ChessNetLinear;
 using ChessNet = ChessNetConv;
+// using ChessNet = ChessNetConv2;
 
 #endif // CHESSNET_H

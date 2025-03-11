@@ -1,3 +1,4 @@
+// https://github.com/archishou/MidnightMoveGen
 #pragma once
 
 #include "../include/move_gen.h"

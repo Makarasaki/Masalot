@@ -18,9 +18,20 @@ float evaluate(ChessNet model, const std::string& pos);
 
 bool isWhite(const std::string& fen);
 
+struct bestMoveInfo
+{
+    std::string move;
+    int nodes;
+    int depth;
+    float eval;
+};
+
 // std::string search_best_move(ChessNet &model, std::string &pos, int depth, std::unordered_map<uint64_t, float> &evaluations_map, const std::unordered_set<std::string> &previous_positions);
 
-std::string search_best_move(
+bool isSafeMove(const std::string &candidate_pos, 
+    const std::unordered_set<std::string> &previous_positions);
+
+bestMoveInfo search_best_move(
     ChessNet &model,
     const std::string &pos,
     int depth,

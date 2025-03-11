@@ -53,7 +53,7 @@ int main()
     net->to(device);
 
     // 4) Load the trained weights
-    std::string model_path = "../../training/NN_weights/model_V1.5_L_FV_evals_scaled_b_and_w_mse_lr1e4_fixed_final.pt";
+    std::string model_path = "../../training/NN_weights/model_V1.6_C_SMALL_FV_b_and_w_evals_scaled_10e_weighted_lr_1e4.pt";
     if (!load_model(net, model_path, device))
     {
         std::cerr << "Failed to load model. Exiting.\n";
